@@ -145,7 +145,10 @@ function say(t,force){if(muted)return;const n=performance.now();if(!force&&n-las
 // a waiting line plays only once the last line has had time to finish, so nothing piles up or gets cut off
 const EDU_N=['zero','one','two','three','four','five','six','seven','eight','nine','ten'];
 const eduCap=s=>s.charAt(0).toUpperCase()+s.slice(1);
-const eduCount=n=>eduCap(EDU_N.slice(1,n+1).join(', '))+'!';
+// positive cheers replace spoken counting; never the same line twice in a row
+const PRAISE=['Awesome!','Super web shot!',"You're a real hero!",'Whoa, nice one!',"Webbed 'em!",'Spidey power!','Keep going, hero!','So cool!','Amazing!','Wow, great job!','Nice web!','You got him!','Super hero move!','Woo hoo!','Way to go!','Fantastic!','Spidey style!','High five, hero!'];
+const WIN_LINES=['Level complete! Amazing!','Level complete! You did it!','Level complete! So awesome!','Level complete! Super hero!','Yeah! You saved the day!'];
+const cheerLast={};function cheer(list){let s,n=0;do{s=list[Math.floor(Math.random()*list.length)];}while(s===cheerLast[list.length]&&++n<20);cheerLast[list.length]=s;return s;}
 const EDU_SUIT=['Red and blue!','Black and white!','Red and black!','Red and black!','All black!','White, pink and blue!','Black and red!','All red!','Black and white!'];
 let eduP=null,eduNums=[],eduLeft=null,eduLastCombo=-1e9,eduLastCrawl=-1e9,eduLastBox=-1e9,eduL=null,eduPrevN=-1,eduStarL=null;
 function eduSay(part,text,within){const n=performance.now();if(!eduP||n>eduP.until)eduP={until:0,count:'',left:'',misc:''};
@@ -155,16 +158,15 @@ function eduTick(){
     if(eduL!==L){eduL=L;eduPrevN=-1;eduLeft=null;eduNums=[];}
     const n=L.enemies.filter(e=>e.state==='live'||e.state==='held').length;
     if(eduPrevN>=0&&n<eduPrevN&&L.state==='play'){eduLeft={n,t:performance.now()};
-      eduSay('left',n===0?'No more bad guys!':n===1?'One bad guy left!':eduCap(EDU_N[n]||String(n))+' bad guys left!');}
+      if(n>0)eduSay('left',cheer(PRAISE),1800);}
     eduPrevN=n;
-    if(L.state==='win'&&eduStarL!==L&&L.stT>=1+(L.stars-1)*.35+.15){eduStarL=L;eduSay('misc',L.stars===1?'One star!':eduCount(L.stars)+' '+eduCap(EDU_N[L.stars])+' stars!',4000);}
   }
   if(eduP){const n=performance.now();if(n>eduP.until)eduP=null;
     else if(n-lastSay>1300){const t=[eduP.count,eduP.left,eduP.misc].filter(Boolean).slice(0,2).join(' ');eduP=null;if(t)say(t,true);}}
 }
 setInterval(eduTick,100);
 function eduComboHit(k,x,y){eduNums.push({n:k+1,x,y,t:performance.now()});if(eduNums.length>9)eduNums.shift();}
-function eduComboEnd(){const n=performance.now();if(n-eduLastCombo<6000)return;eduLastCombo=n;eduSay('count','One, two, three! Three hits!');}
+function eduComboEnd(){const n=performance.now();if(n-eduLastCombo<6000)return;eduLastCombo=n;eduSay('left',cheer(PRAISE),2500);}
 function eduCrawl(dir,pop){const n=performance.now();if(pop||n-eduLastCrawl<3500)return;eduLastCrawl=n;if(n-lastSay>1300)say(dir<0?'Up!':'Down!');}
 function eduBox(){const n=performance.now();if(n-eduLastBox<5000)return;eduLastBox=n;eduSay('misc','Brown box!',2000);}
 function eduDraw(){const n=performance.now();
@@ -891,6 +893,7 @@ const NL=LV.length;
 const OLD2NEW=[0,1,3,4,6,2,9,10,12,13,15,7];
 const isBossLvl=i=>i%3===2;
 const ESZ={goon:[32,56],bat:[32,56],drone:[50,34]};
+const CHAR_SC=1.05; // characters drawn 5% bigger; hit boxes and aim points follow, walking collision stays tile-safe
 const BCH={L:'lizard',R:'robot',O:'goblin',T:'doc',Z:'stinger',V:'vulture',X:'rhino',B:'bigboss',Y:'hob'};
 const TCH={'#':1,'=':2,'C':3,'G':4,'S':5,'H':6};
 const solidT=t=>t>0&&t!==7;
@@ -935,7 +938,7 @@ function trace(x,y,dx,dy){
   pts.push({x,y});return{pts,hit:{k:'none'}};
 }
 function los(x0,y0,x1,y1){const d=hyp(x1-x0,y1-y0),n=Math.ceil(d/10);for(let k=1;k<n;k++){const t=k/n;if(solidAt(lerp(x0,x1,t),lerp(y0,y1,t)))return false;}return true;}
-function ebox(e,p){return{x:e.x-e.w/2-p,y:e.y-e.h-p,w:e.w+2*p,h:e.h+2*p};}
+function ebox(e,p){const w=e.w*CHAR_SC,h=e.h*CHAR_SC;return{x:e.x-w/2-p,y:e.y-h-p,w:w+2*p,h:h+2*p};}
 const inBox=(x,y,b)=>x>b.x&&x<b.x+b.w&&y>b.y&&y<b.y+b.h;
 function part(x,y,vx,vy,col,sz,life,g,k){L.parts.push({x,y,vx,vy,col,sz,life,max:life,g:g||0,k:k||'sq',rot:rnd(0,6),vr:rnd(-8,8)});}
 function burst(x,y,n,cols,sp,sz,g){for(let i=0;i<n;i++){const a=rnd(0,6.28),v=rnd(.3,1)*sp;part(x,y,Math.cos(a)*v,Math.sin(a)*v,cols[i%cols.length],sz*rnd(.6,1.3),rnd(.4,.9),g);}}
@@ -950,7 +953,7 @@ function doZip(tx,ty,nx,ny,door,o){if(L.zip||L.state!=='play')return;const P=L.p
   L.zip={fx:P.x,fy:P.y,tx,ty,nx,ny,t:0,door,dur:o.dur||.24,arc:o.arc||0,after:o.after||null,quiet:o.quiet};L.mark=null;if(!o.quiet)sfx('swoosh');}
 function zipToMark(){if(L.mark){const m=L.mark;L.autoZ=0;doZip(m.x+m.nx*22,m.y+m.ny*22,m.nx,m.ny);}}
 // ---- aim assist: snap toward the closest target within ~35 degrees that the web can actually reach
-function aimTargets(){const T=[];for(const e of L.enemies)if(e.state==='live')T.push({x:e.x,y:e.y-e.h/2,e});
+function aimTargets(){const T=[];for(const e of L.enemies)if(e.state==='live')T.push({x:e.x,y:e.y-e.h*CHAR_SC/2,e});
   for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){const v=L.grid[r][c];if(v===3||v===5||v===6)T.push({x:c*TS+25,y:r*TS+25,c,r,k:v});}
   if(L.door.open)T.push({x:L.door.x+25,y:L.door.y+L.door.h/2,door:1});return T;}
 function aimOK(t,x,y,vx,vy,d){const tr=trace(x,y,vx,vy),h=tr.hit;
@@ -1234,7 +1237,7 @@ function bossExtras(e,t){const B=BOSS[e.type];if(!B||SIL)return;const f=B.face,l
       for(const[a,b]of[[-.22,-.55],[.12,-.35]]){const x=a*e.w,y=b*e.h;cx.moveTo(x,y);cx.lineTo(x+7,y+9);cx.lineTo(x+1,y+16);cx.lineTo(x+9,y+26);}cx.stroke();}
     else{cx.save();cx.translate(f[0]-14,f[1]+6);cx.rotate(.6);R(-10,-4,20,8,'#f2c79a');R(-3,-4,6,8,'#e0a87a');cx.restore();}}
   if(e.dz>0&&live||e.state==='beaten'&&B.def!=='poof'){for(let k=0;k<3;k++){const a=t*4+k*2.1;star(f[0]+Math.cos(a)*22,f[1]-22+Math.sin(a)*7,7,'#ffd23f');}}}
-function drawBossTel(e){if(!e.tel||e.state!=='live')return;const t=L?L.t:0,p=1+Math.sin(t*18)*.12,x=e.x,y=e.y-e.h-34-(e.type==='stinger'?40:0);
+function drawBossTel(e){if(!e.tel||e.state!=='live')return;const t=L?L.t:0,p=1+Math.sin(t*18)*.12,x=e.x,y=e.y-e.h*CHAR_SC-34-(e.type==='stinger'?40:0);
   cx.save();cx.translate(x,y);cx.scale(p,p);circ(0,0,24,'#fff');cx.lineWidth=4;cx.strokeStyle='#d6202a';cx.beginPath();cx.arc(0,0,24,0,7);cx.stroke();
   cx.fillStyle='#d6202a';cx.font='900 34px system-ui,sans-serif';cx.textAlign='center';cx.textBaseline='middle';cx.fillText('!',0,2);cx.restore();}
 function drawMarks(){for(const m of L.marks){const a=m.t/m.max,p=.85+Math.sin(L.t*14)*.15;cx.save();cx.globalAlpha=Math.min(1,(1-a)*3);
@@ -1360,7 +1363,7 @@ function update(dt){
   // win
   const d=L.door;if(d.open&&!L.zip&&!L.combo&&!L.crawl&&hyp(P.x-(d.x+25),P.y-(d.y+d.h-30))<88)win();
 }
-function win(){L.state='win';L.stT=0;L.ball=null;L.pellets=[];sfx('fanfare');say('Level complete!',true);
+function win(){L.state='win';L.stT=0;L.ball=null;L.pellets=[];sfx('fanfare');say(cheer(WIN_LINES),true);
   L.stars=L.shots<=L.par+2?3:L.shots<=L.par+6?2:1;const i=L.i;prog.stars[i]=Math.max(prog.stars[i],L.stars);
   prog.lvl=Math.max(prog.lvl,Math.min(NL,i+2));
   const u=UNLOCKS[i];if(u&&!(prog.mask>>u&1)){prog.mask|=1<<u;L.newSuit=u;}
@@ -1420,7 +1423,7 @@ function drawHero(suit,x,y,ang,s,o){o=o||{};const p=SUITP[suit]||SUITP[0];cx.sav
   if(!SIL){cx.save();cx.translate(0,bob);if(o.dizzy){cx.strokeStyle='#000';cx.lineWidth=2.5;cx.beginPath();cx.arc(-6,-18,4,0,5.5);cx.moveTo(10,-18);cx.arc(6,-18,4,0,5.5);cx.stroke();}else heroEyes(p);cx.restore();}
   cx.restore();}
 function drawEnemy(e){const big=isBoss(e);
-  cx.save();cx.translate(e.x,e.y);if(e.rot){cx.translate(0,-e.h/2);cx.rotate(e.rot);cx.translate(0,e.h/2);}
+  cx.save();cx.translate(e.x,e.y);cx.scale(CHAR_SC,CHAR_SC);if(e.rot){cx.translate(0,-e.h/2);cx.rotate(e.rot);cx.translate(0,e.h/2);}
   if(e.state==='webbed'&&e.wt<.3){const s=1+Math.sin(e.wt*40)*.08;cx.scale(s,1/s);}
   cx.scale(e.dir,1);FL=e.flash>0&&Math.floor(e.flash*14)%2===0;const t=e.t;
   if(e.type==='goon'||e.type==='bat'){const pc=e.type==='goon'?'#7b2fbf':'#5a238f',st=e.state==='live'?Math.floor(t*6)%2:0,sw=e.state==='live';
@@ -1528,18 +1531,18 @@ function drawDoor(){const d=L.door,t=L.t;R(d.x-6,d.y-6,d.w+12,d.h+6,'#3b2a1e');
     R(d.x,d.y,d.w*(1-d.oa*.75),d.h,'#7a4f2a');const ay=d.y-30+Math.sin(t*6)*6;poly([d.x+25,ay+18,d.x+10,ay,d.x+18,ay,d.x+18,ay-14,d.x+32,ay-14,d.x+32,ay,d.x+40,ay],'#3ddc5a','#0b5d1e',2);}
   else{R(d.x,d.y,d.w,d.h,'#7a4f2a');R(d.x+6,d.y+8,d.w-12,d.h*.38,'#6a4222');R(d.x+6,d.y+d.h*.52,d.w-12,d.h*.38,'#6a4222');drawIcon('lock',d.x+25,d.y+48,.55,'#ffd23f');}}
 // target marker: original chunky cartoon spider emblem (body + 8 legs) in the hero's red, blue and white; pulses like the old ring
-function spiderMark(x,y,s,t){const pu=1+Math.sin(t*10)*.12,k=s*pu;cx.save();cx.translate(x,y);cx.scale(k,k);cx.lineCap='round';cx.lineJoin='round';
-  cx.fillStyle='rgba(232,24,44,.14)';cx.beginPath();cx.arc(0,0,34,0,7);cx.fill();
-  cx.strokeStyle='#fff';cx.lineWidth=9;cx.beginPath();cx.arc(0,0,34,0,7);cx.stroke();cx.strokeStyle='#e8182c';cx.lineWidth=5;cx.stroke();
-  const LG=[[-5,-7,-13,-15,-14,-25],[-6,-2,-17,-6,-23,-13],[-6,3,-17,7,-23,15],[-5,8,-13,16,-14,26]];
-  for(const[w,c]of[[10,'#fff'],[5,'#1e4fc2']]){cx.strokeStyle=w>6?'#fff':c;cx.lineWidth=w;cx.beginPath();
+function spiderMark(x,y,s,t){const pu=1+Math.sin(t*10)*.07,k=s*pu;cx.save();cx.translate(x,y);cx.scale(k,k);cx.lineCap='round';cx.lineJoin='round';
+  const LG=[[-5,-7,-12,-14,-13,-23],[-6,-2,-16,-6,-21,-12],[-6,3,-16,7,-21,14],[-5,8,-12,15,-13,24]];
+  for(const[w,c]of[[11.5,'#fff'],[7,'#1e4fc2']]){cx.strokeStyle=c;cx.lineWidth=w;cx.beginPath();
     for(const l of LG)for(const d of[1,-1]){cx.moveTo(l[0]*d,l[1]);cx.lineTo(l[2]*d,l[3]);cx.lineTo(l[4]*d,l[5]);}cx.stroke();}
-  cx.strokeStyle='#fff';cx.lineWidth=4;cx.fillStyle='#1e4fc2';
-  cx.beginPath();cx.ellipse(0,9,8,12,0,0,7);cx.fill();cx.stroke();
-  cx.beginPath();cx.arc(0,-9,7,0,7);cx.fill();cx.stroke();
-  cx.fillStyle='#fff';cx.beginPath();cx.ellipse(-2.8,-10,2.2,3,0,0,7);cx.ellipse(2.8,-10,2.2,3,0,0,7);cx.fill();
-  cx.fillStyle='#e8182c';cx.beginPath();cx.ellipse(0,8,3.2,5.5,0,0,7);cx.fill();
+  cx.strokeStyle='#fff';cx.lineWidth=3;cx.fillStyle='#1e4fc2';
+  cx.beginPath();cx.ellipse(0,9,8.5,12,0,0,7);cx.fill();cx.stroke();
+  cx.beginPath();cx.arc(0,-9,7.5,0,7);cx.fill();cx.stroke();
+  cx.fillStyle='#fff';cx.beginPath();cx.ellipse(-2.8,-10,2.4,3.2,0,0,7);cx.ellipse(2.8,-10,2.4,3.2,0,0,7);cx.fill();
+  cx.fillStyle='#e8182c';cx.beginPath();cx.ellipse(0,8,3.4,5.8,0,0,7);cx.fill();
   cx.restore();}
+// marker size: about 55% of the target's on-screen height (small bullseye), fixed small size on doors and tiles
+const markS=tt=>tt.e?clamp(tt.e.h*CHAR_SC*.55/58,.5,.9):.55;
 function drawSplat(x,y,nx,ny,a,s){cx.save();cx.translate(x,y);cx.rotate(Math.atan2(ny,nx));cx.globalAlpha=a;cx.strokeStyle='#fff';cx.lineWidth=2;cx.beginPath();
   for(let k=0;k<7;k++){const an=-1.4+k*.47;cx.moveTo(0,0);cx.lineTo(Math.cos(an)*20*s,Math.sin(an)*20*s);}
   for(const rr of[8,15])for(let k=0;k<6;k++){const a1=-1.4+k*.47,a2=a1+.47;cx.moveTo(Math.cos(a1)*rr*s,Math.sin(a1)*rr*s);cx.lineTo(Math.cos(a2)*rr*s,Math.sin(a2)*rr*s);}
@@ -1582,14 +1585,14 @@ const STORY={
   bigboss:[['villain','I am the Big Boss! I took all the presents!','present'],['hero','Presents are for the birthday party!','present'],['villain','Hmph! Try and stop me!','go']],
   hob:[['villain','Ha ha ha! I am Hob Goblin!','laugh'],['villain','I took the whole birthday cake!','cake'],['hero','Not if we share it!','heart'],['narr','Last big battle! You can do it!','go']]},
  post:{
-  lizard:[['villain','Okay, okay! Here are the sprinkles.','sprinkles'],['villain','Sorry! I will eat real bugs instead.','sorry'],['narr','Sprinkles are back! One!','sprinkles']],
-  goblin:[['villain','Poof! Aww, my glider went floppy.','oops'],['villain','Here are the candles. Sorry!','candle'],['narr','Candles are back! Two!','candle']],
-  doc:[['villain','Oh no! My arms are all tied up!','oops'],['villain','Fine. Have the cupcakes. Sorry!','cupcake'],['narr','Cupcakes are back! Three!','cupcake']],
-  stinger:[['villain','Hmph. The ice cream melted anyway.','icecream'],["hero","That's okay! We can make more!",'heart'],['narr','Ice cream is back! Four!','icecream']],
-  vulture:[['villain','Squawk! The balloons tickled my feathers!','balloon'],['villain','Here, take them back. Sorry!','sorry'],['narr','Balloons are back! Five!','balloon']],
-  rhino:[['villain','Ooh, I am so dizzy!','oops'],['villain','Here is the drum. Sorry!','drum'],['narr','The party drum is back! Six!','drum']],
-  bigboss:[['villain','Hmph! You are very bouncy.','oops'],['villain','The presents go back. I am sorry.','present'],['narr','Presents are back! Seven!','present']],
-  hob:[['villain','Poof! Okay, okay. I give up!','oops'],['villain','I just wanted to come to the party.','sad'],['hero','You can come! Everybody is invited!','heart'],['narr','The cake is back! Eight! Party time!','cake']]},
+  lizard:[['villain','Okay, okay! Here are the sprinkles.','sprinkles'],['villain','Sorry! I will eat real bugs instead.','sorry'],['narr','Sprinkles are back! Yippee!','sprinkles']],
+  goblin:[['villain','Poof! Aww, my glider went floppy.','oops'],['villain','Here are the candles. Sorry!','candle'],['narr','Candles are back! Awesome!','candle']],
+  doc:[['villain','Oh no! My arms are all tied up!','oops'],['villain','Fine. Have the cupcakes. Sorry!','cupcake'],['narr','Cupcakes are back! Yay!','cupcake']],
+  stinger:[['villain','Hmph. The ice cream melted anyway.','icecream'],["hero","That's okay! We can make more!",'heart'],['narr','Ice cream is back! So cool!','icecream']],
+  vulture:[['villain','Squawk! The balloons tickled my feathers!','balloon'],['villain','Here, take them back. Sorry!','sorry'],['narr','Balloons are back! Woo hoo!','balloon']],
+  rhino:[['villain','Ooh, I am so dizzy!','oops'],['villain','Here is the drum. Sorry!','drum'],['narr','The party drum is back! Way to go!','drum']],
+  bigboss:[['villain','Hmph! You are very bouncy.','oops'],['villain','The presents go back. I am sorry.','present'],['narr','Presents are back! Amazing!','present']],
+  hob:[['villain','Poof! Okay, okay. I give up!','oops'],['villain','I just wanted to come to the party.','sad'],['hero','You can come! Everybody is invited!','heart'],['narr','The cake is back! Party time!','cake']]},
  end:[['narr','Happy birthday, city!','cake'],['villains','Sorry, everybody! Can we share?','sorry'],['hero','Yes! Sharing is the best!','heart'],
    ['narr','Everybody gets cake! Dance party!','party'],['narr','The end! Yay! You did it!','star']]};
 // villain look-alike voices; the heroes' voices follow the hero being played
@@ -1759,13 +1762,13 @@ function drawPlay(){const P=L.player,t=L.t;buildBG();cx.drawImage(bgC,0,0,VW,VH)
   if(L.mark){const m=L.mark,pu=1+Math.sin(t*8)*.15;circ(m.x,m.y,22*pu,'rgba(77,210,255,.25)');drawSplat(m.x,m.y,m.nx,m.ny,1,1.2*pu);}
   // aim: short fat arrow from the hero in the swipe direction, spider emblem on the snapped target
   if(aim&&aim.moved&&L.state==='play'&&!busy()){const dx=aim.x-aim.sx,dy=aim.y-aim.sy,ln=hyp(dx,dy);
-    if(ln>1){const ux=dx/ln,uy=dy/ln,as=assist(ux,uy);if(as)spiderMark(as.t.x,as.t.y,1,t);
+    if(ln>1){const ux=dx/ln,uy=dy/ln,as=assist(ux,uy);if(as)spiderMark(as.t.x,as.t.y,markS(as.t),t);
       cx.save();cx.translate(P.x,P.y);cx.rotate(Math.atan2(uy,ux));cx.globalAlpha=.92;
       poly([28,-9,78,-9,78,-22,112,0,78,22,78,9,28,9],'#ffd23f','#fff',4);cx.restore();cx.globalAlpha=1;}}
   // hero
   {const cr=L.crawl,pop=cr&&cr.stage===2,cling=P.nx!==0&&!L.zip&&!pop;let hx=P.x,ha=L.zip||pop?0:P.ang,face=P.face||1;
     if(cling){ha=0;hx=P.x-P.nx*6;face=-P.nx;}
-    if(!(L.inv>0&&Math.floor(L.inv*12)%2)||L.combo||L.state!=='play'){drawHero(prog.suit,hx,P.y,ha,1,{t,shoot:P.shootT>0,dizzy:L.state==='oops',face,cling,crouch:cling||(P.ny>0&&!L.zip),climb:cr?cr.ph:0,
+    if(!(L.inv>0&&Math.floor(L.inv*12)%2)||L.combo||L.state!=='play'){drawHero(prog.suit,hx,P.y,ha,CHAR_SC,{t,shoot:P.shootT>0,dizzy:L.state==='oops',face,cling,crouch:cling||(P.ny>0&&!L.zip),climb:cr?cr.ph:0,
       pose:L.combo&&L.combo.poseT>0?L.combo.pose:null});}}
   drawFx();
   if(L.inv>0){cx.strokeStyle='rgba(120,220,255,'+(L.inv/1.7)+')';cx.lineWidth=4;cx.beginPath();cx.arc(P.x,P.y,32,0,7);cx.stroke();}

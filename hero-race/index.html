@@ -52,6 +52,7 @@
       <canvas class="x-game" id="game" role="img" aria-label="Hero Race: tap the big buttons to change your hero to match the road, water, cliff, sky, cave and rocks."></canvas>
     </div>
     <script src="ui.js"></script>
+    <script src="aaa-music.js"></script>
     <script>
 /* ToyBand v1: a tiny preschool-TV style music engine for Alex's games.
    Everything is synthesized once at start into small sample buffers (glockenspiel, ukulele, recorder, kazoo,
@@ -532,7 +533,7 @@ if(window.visualViewport)window.visualViewport.addEventListener('resize',kick);}
 
   /* ---------- audio ---------- */
   var AC = null, master = null, muted = false, noiseBuf = null, whooshGain = null, windGain = null, lastPop = 0;
-  var musicGain = null, echoIn = null, MUSIC_VOL = 0.42, MUS = null, musPrev = "", musStingT = -9;
+  var musicGain = null, echoIn = null, MUSIC_VOL = 0.42, MUS = null, musPrev = "", musStingT = -9, AAA = null;
   function initAudio() {
     if (AC) { if (AC.state === "suspended") AC.resume(); return; }
     var C = window.AudioContext || window.webkitAudioContext;
@@ -555,6 +556,9 @@ if(window.visualViewport)window.visualViewport.addEventListener('resize',kick);}
       musicGain = AC.createGain(); musicGain.gain.value = musicOn ? MUSIC_VOL : 0; musicGain.connect(master);
       /* ToyBand soundtrack: original preschool-TV style themes, adaptive layers + stingers */
       try { MUS = ToyBand.create(AC, musicGain, { songs: HR_SONGS, stingers: HR_STINGS, vol: 0.85 }); MUS.setOn(musicOn); } catch (e) { MUS = null; }
+      /* AAA race theme (music/hero-race-aaa.mp3): intro once, then a gapless loop; replaces the ToyBand race song.
+         Lazy: fetched + decoded on this first tap so it is ready by the countdown. */
+      try { if (window.AAAMusic && window.fetch) { AAA = AAAMusic.create(AC, musicGain, { vol: 0.9, tracks: { race: { url: "music/hero-race-aaa.mp3", loopStart: 6.666667, loopEnd: 46.666667 } } }); AAA.preload("race"); } } catch (e) { AAA = null; }
     } catch (e) { AC = null; }
     try { var u = new SpeechSynthesisUtterance(" "); u.volume = 0; window.speechSynthesis.speak(u); } catch (e) {}
   }
@@ -679,13 +683,19 @@ if(window.visualViewport)window.visualViewport.addEventListener('resize',kick);}
      finish = fanfare then the title theme with the whole band */
   function musicTick() {
     if (!MUS) return;
-    MUS.held = false;
+    MUS.held = false; if (AAA) AAA.hold(false);
     if (state !== musPrev) {
       if (state === "count") { MUS.unboost(); MUS.setI(0, 0.3); }
-      if (state === "finish") { var L = MUS.sting("fanfare"); MUS.play("title", { delay: L * 0.8, fade: 0.35 }); MUS.setI(2, 0.05); }
+      if (state === "finish") { if (AAA) AAA.stop(0.5); var L = MUS.sting("fanfare"); MUS.play("title", { delay: L * 0.8, fade: 0.35 }); MUS.setI(2, 0.05); }
       musPrev = state;
     }
     if (state === "finish") return;
+    if ((state === "count" || state === "race") && AAA) {
+      /* AAA theme for racing; ToyBand fades out (its stingers still play on top) */
+      AAA.play("race", { fade: 1.0 }); if (MUS.cur) MUS.stop(1.0);
+      return;
+    }
+    if (AAA && AAA.want()) AAA.stop(1.0);
     if (state === "count" || state === "race") {
       MUS.play("race");
       if (!MUS.boosted()) MUS.setI(state === "race" ? 1 : 0, 0.8);
@@ -840,6 +850,7 @@ if(window.visualViewport)window.visualViewport.addEventListener('resize',kick);}
     if (whooshGain) { whooshGain.gain.setTargetAtTime(0, AC.currentTime, 0.05); windGain.gain.setTargetAtTime(0, AC.currentTime, 0.05); }
     duck(false);
     if (MUS) MUS.held = true;
+    if (AAA) AAA.hold(true);
   }
   function resumeGame() { paused = false; slowUntil = 0; slowEnd = 0; }
   function goHome() {

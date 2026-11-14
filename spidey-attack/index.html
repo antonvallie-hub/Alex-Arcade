@@ -20,6 +20,7 @@ canvas{display:block;touch-action:none;position:absolute;left:0;top:0}
 </style>
 </head><body>
 <canvas id="c"></canvas>
+<script src="aaa-music.js"></script>
 <script>
 'use strict';
 // ===== core =====
@@ -98,14 +99,21 @@ const SFX={
 function sfx(n){if(!AC||muted)return;try{SFX[n]();}catch(e){}}
 // soundtrack director (ToyBand): title theme on menus, sneaky-fun level theme, bigger/faster boss theme,
 // fanfare on level complete, little stingers on oops/new suit; ducks under the voice
-let MUS=null,musPrev='';
+// AAA in-level music (music/*.mp3, gapless WebAudio loops, intro once): main theme on normal levels, boss theme on
+// boss levels, Hob Goblin final theme on the last level. ToyBand keeps menus, story scenes, the party and all stingers.
+let MUS=null,musPrev='',AAA=null;
+const AAA_TRACKS={main:{url:"music/spidey-attack-aaa.mp3",loopStart:6.0,loopEnd:48.0},boss:{url:"music/spidey-boss-aaa.mp3",loopStart:2.857143,loopEnd:28.571429},final:{url:"music/spidey-final-aaa.mp3",loopStart:3.636372,loopEnd:25.454535}};
+function musDuck(s){if(MUS)MUS.duckFor(s);if(AAA)AAA.duckFor(s);}
 function musTick(){
   if(!AC)return;
-  if(!MUS){try{MUS=ToyBand.create(AC,musG,{songs:SH_SONGS,stingers:SH_STINGS,vol:2});}catch(e){MUS=false;}}
+  if(!MUS){try{MUS=ToyBand.create(AC,musG,{songs:SH_SONGS,stingers:SH_STINGS,vol:2});}catch(e){MUS=false;}
+    try{if(window.AAAMusic&&window.fetch){AAA=AAAMusic.create(AC,musG,{vol:2.2,tracks:AAA_TRACKS});AAA.preload('main').then(()=>{AAA.preload('boss');AAA.preload('final');});}}catch(e){AAA=null;}}
   if(!MUS)return;MUS.setOn(!muted);
   const st=scr==='play'&&L?'play_'+L.state:scr;
-  if(st!==musPrev){if(st==='play_win'){const d=MUS.sting('fanfare');MUS.play('title',{delay:d*.8,fade:.35});MUS.setI(1);}else if(st==='play_oops')MUS.sting('oops');
+  if(st!==musPrev){if(st==='play_win'){if(AAA)AAA.stop(.5);const d=MUS.sting('fanfare');MUS.play('title',{delay:d*.8,fade:.35});MUS.setI(1);}else if(st==='play_oops')MUS.sting('oops');
     else if(st==='story'&&story&&story.o.boss&&!story.o.beaten)MUS.sting('villain');musPrev=st;}
+  if(scr==='play'&&L&&AAA){if(L.state==='win')return;AAA.play(L.boss?(L.i===NL-1?'final':'boss'):'main',{fade:1.2});if(MUS.cur)MUS.stop(1);return;}
+  if(AAA&&AAA.want())AAA.stop(1);
   if(scr==='play'&&L){if(L.state==='win')return;const w=L.theme;MUS.play(L.boss?(L.i===NL-1?'final':SH_BOSS_SONG[w]):SH_LEVEL_SONG[w]);MUS.setI(1);}
   else if(scr==='story'&&story){MUS.play(story.o.end?'party':story.o.boss&&!story.o.beaten&&story.o.w===7?'final':'story');MUS.setI(story.o.end?2:0);}
   else{MUS.play('title');MUS.setI(0);}
@@ -128,11 +136,11 @@ const VOX={narr:{p:1.4,r:1.05},hero:{p:1.2,r:1.1},ghost:{p:1.6,r:1.12},night:{p:
   lizard:{p:.55,r:.85,m:1},goblin:{p:1.9,r:1.25,m:1},doc:{p:.8,r:.9,m:1},stinger:{p:1.35,r:1.3,m:1},vulture:{p:.5,r:.8,m:1},rhino:{p:.3,r:.8,m:1},
   bigboss:{p:.1,r:.75,m:1},hob:{p:1.7,r:1.15,m:1},all:{p:1.1,r:1}};
 function sayAs(t,who,onend){if(muted)return false;const v=VOX[who]||VOX.narr;lastSay=performance.now();
-  if(MUS)MUS.duckFor(.6+t.length*.075/v.r);
+  musDuck(.6+t.length*.075/v.r);
   try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t),vv=v.m&&voiceM?voiceM:voice;if(vv){u.voice=vv;u.lang=vv.lang;}else u.lang='en-US';
     u.pitch=v.p;u.rate=v.r;u.volume=1;if(onend){u.onend=onend;u.onerror=onend;}speechSynthesis.speak(u);return true;}catch(e){return false;}}
 function say(t,force){if(muted)return;const n=performance.now();if(!force&&n-lastSay<1500)return;lastSay=n;
-  if(MUS)MUS.duckFor(.5+t.length*.07);try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);if(voice){u.voice=voice;u.lang=voice.lang;}else u.lang='en-US';u.pitch=1.4;u.rate=1.05;u.volume=1;speechSynthesis.speak(u);}catch(e){}}
+  musDuck(.5+t.length*.07);try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);if(voice){u.voice=voice;u.lang=voice.lang;}else u.lang='en-US';u.pitch=1.4;u.rate=1.05;u.volume=1;speechSynthesis.speak(u);}catch(e){}}
 // ===== learning words (narrator + small numerals only; never changes aiming, hits, enemies or stars) =====
 // a waiting line plays only once the last line has had time to finish, so nothing piles up or gets cut off
 const EDU_N=['zero','one','two','three','four','five','six','seven','eight','nine','ten'];

@@ -1527,6 +1527,19 @@ function drawDoor(){const d=L.door,t=L.t;R(d.x-6,d.y-6,d.w+12,d.h+6,'#3b2a1e');
     cx.fillStyle='rgba(255,240,150,'+(.25+Math.sin(t*5)*.12)+')';cx.fillRect(d.x-16,d.y-16,d.w+32,d.h+16);
     R(d.x,d.y,d.w*(1-d.oa*.75),d.h,'#7a4f2a');const ay=d.y-30+Math.sin(t*6)*6;poly([d.x+25,ay+18,d.x+10,ay,d.x+18,ay,d.x+18,ay-14,d.x+32,ay-14,d.x+32,ay,d.x+40,ay],'#3ddc5a','#0b5d1e',2);}
   else{R(d.x,d.y,d.w,d.h,'#7a4f2a');R(d.x+6,d.y+8,d.w-12,d.h*.38,'#6a4222');R(d.x+6,d.y+d.h*.52,d.w-12,d.h*.38,'#6a4222');drawIcon('lock',d.x+25,d.y+48,.55,'#ffd23f');}}
+// target marker: original chunky cartoon spider emblem (body + 8 legs) in the hero's red, blue and white; pulses like the old ring
+function spiderMark(x,y,s,t){const pu=1+Math.sin(t*10)*.12,k=s*pu;cx.save();cx.translate(x,y);cx.scale(k,k);cx.lineCap='round';cx.lineJoin='round';
+  cx.fillStyle='rgba(232,24,44,.14)';cx.beginPath();cx.arc(0,0,34,0,7);cx.fill();
+  cx.strokeStyle='#fff';cx.lineWidth=9;cx.beginPath();cx.arc(0,0,34,0,7);cx.stroke();cx.strokeStyle='#e8182c';cx.lineWidth=5;cx.stroke();
+  const LG=[[-5,-7,-13,-15,-14,-25],[-6,-2,-17,-6,-23,-13],[-6,3,-17,7,-23,15],[-5,8,-13,16,-14,26]];
+  for(const[w,c]of[[10,'#fff'],[5,'#1e4fc2']]){cx.strokeStyle=w>6?'#fff':c;cx.lineWidth=w;cx.beginPath();
+    for(const l of LG)for(const d of[1,-1]){cx.moveTo(l[0]*d,l[1]);cx.lineTo(l[2]*d,l[3]);cx.lineTo(l[4]*d,l[5]);}cx.stroke();}
+  cx.strokeStyle='#fff';cx.lineWidth=4;cx.fillStyle='#1e4fc2';
+  cx.beginPath();cx.ellipse(0,9,8,12,0,0,7);cx.fill();cx.stroke();
+  cx.beginPath();cx.arc(0,-9,7,0,7);cx.fill();cx.stroke();
+  cx.fillStyle='#fff';cx.beginPath();cx.ellipse(-2.8,-10,2.2,3,0,0,7);cx.ellipse(2.8,-10,2.2,3,0,0,7);cx.fill();
+  cx.fillStyle='#e8182c';cx.beginPath();cx.ellipse(0,8,3.2,5.5,0,0,7);cx.fill();
+  cx.restore();}
 function drawSplat(x,y,nx,ny,a,s){cx.save();cx.translate(x,y);cx.rotate(Math.atan2(ny,nx));cx.globalAlpha=a;cx.strokeStyle='#fff';cx.lineWidth=2;cx.beginPath();
   for(let k=0;k<7;k++){const an=-1.4+k*.47;cx.moveTo(0,0);cx.lineTo(Math.cos(an)*20*s,Math.sin(an)*20*s);}
   for(const rr of[8,15])for(let k=0;k<6;k++){const a1=-1.4+k*.47,a2=a1+.47;cx.moveTo(Math.cos(a1)*rr*s,Math.sin(a1)*rr*s);cx.lineTo(Math.cos(a2)*rr*s,Math.sin(a2)*rr*s);}
@@ -1744,9 +1757,9 @@ function drawPlay(){const P=L.player,t=L.t;buildBG();cx.drawImage(bgC,0,0,VW,VH)
   for(const e of L.enemies)drawEnemy(e);
   for(const p of L.pellets)drawPellet(p);
   if(L.mark){const m=L.mark,pu=1+Math.sin(t*8)*.15;circ(m.x,m.y,22*pu,'rgba(77,210,255,.25)');drawSplat(m.x,m.y,m.nx,m.ny,1,1.2*pu);}
-  // aim: short fat arrow from the hero in the swipe direction, ring on the snapped target
+  // aim: short fat arrow from the hero in the swipe direction, spider emblem on the snapped target
   if(aim&&aim.moved&&L.state==='play'&&!busy()){const dx=aim.x-aim.sx,dy=aim.y-aim.sy,ln=hyp(dx,dy);
-    if(ln>1){const ux=dx/ln,uy=dy/ln,as=assist(ux,uy);if(as){const tt=as.t,pu=1+Math.sin(t*10)*.12;cx.strokeStyle='#ffd23f';cx.lineWidth=5;cx.beginPath();cx.arc(tt.x,tt.y,34*pu,0,7);cx.stroke();}
+    if(ln>1){const ux=dx/ln,uy=dy/ln,as=assist(ux,uy);if(as)spiderMark(as.t.x,as.t.y,1,t);
       cx.save();cx.translate(P.x,P.y);cx.rotate(Math.atan2(uy,ux));cx.globalAlpha=.92;
       poly([28,-9,78,-9,78,-22,112,0,78,22,78,9,28,9],'#ffd23f','#fff',4);cx.restore();cx.globalAlpha=1;}}
   // hero

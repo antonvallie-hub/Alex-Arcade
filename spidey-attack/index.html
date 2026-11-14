@@ -136,11 +136,52 @@ const VOX={narr:{p:1.4,r:1.05},hero:{p:1.2,r:1.1},ghost:{p:1.6,r:1.12},night:{p:
   lizard:{p:.55,r:.85,m:1},goblin:{p:1.9,r:1.25,m:1},doc:{p:.8,r:.9,m:1},stinger:{p:1.35,r:1.3,m:1},vulture:{p:.5,r:.8,m:1},rhino:{p:.3,r:.8,m:1},
   bigboss:{p:.1,r:.75,m:1},hob:{p:1.7,r:1.15,m:1},all:{p:1.1,r:1}};
 function sayAs(t,who,onend){if(muted)return false;const v=VOX[who]||VOX.narr;lastSay=performance.now();
-  musDuck(.6+t.length*.075/v.r);
+  if(who==='narr'||!VOX[who]){if(sayClip([t],onend,()=>sayAsTTS(t,v,onend)))return true;vLog(t,'tts');}else vStop();
+  return sayAsTTS(t,v,onend);}
+function sayAsTTS(t,v,onend){musDuck(.6+t.length*.075/v.r);
   try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t),vv=v.m&&voiceM?voiceM:voice;if(vv){u.voice=vv;u.lang=vv.lang;}else u.lang='en-US';
     u.pitch=v.p;u.rate=v.r;u.volume=1;if(onend){u.onend=onend;u.onerror=onend;}speechSynthesis.speak(u);return true;}catch(e){return false;}}
-function say(t,force){if(muted)return;const n=performance.now();if(!force&&n-lastSay<1500)return;lastSay=n;
-  musDuck(.5+t.length*.07);try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);if(voice){u.voice=voice;u.lang=voice.lang;}else u.lang='en-US';u.pitch=1.4;u.rate=1.05;u.volume=1;speechSynthesis.speak(u);}catch(e){}}
+// ===== narrator voice clips: Kokoro "Hype Announcer" (am_fenrir 1.25, dry), rendered by /workspace/work/spidey-voice/render.py =====
+// every narrator line has a clip; hero and villain character lines stay on browser speech. Clips load after the first tap.
+// say()/sayAs(...,'narr') play the clip (joined lines back to back), duck the music and fire onend when it finishes;
+// a new forced line interrupts the old one, unforced lines and praise wait until the voice is free (so nothing piles up);
+// if a clip is missing or fails to load, that line falls back to the browser voice.
+const VOICE_CLIPS={"boss time!":"boss-time","oops!":"oops","pow!":"pow","great shot!":"great-shot","up you go!":"up-you-go","spidey attack!":"spidey-attack","gotcha!":"gotcha","you did it!":"you-did-it","hooray!":"hooray","brown box!":"brown-box","red... now green! green means go!":"red-now-green-green-means-go","up!":"up","down!":"down","awesome!":"awesome","super web shot!":"super-web-shot","you're a real hero!":"youre-a-real-hero","whoa, nice one!":"whoa-nice-one","webbed 'em!":"webbed-em","spidey power!":"spidey-power","keep going, hero!":"keep-going-hero","so cool!":"so-cool","amazing!":"amazing","wow, great job!":"wow-great-job","nice web!":"nice-web","you got him!":"you-got-him","super hero move!":"super-hero-move","woo hoo!":"woo-hoo","way to go!":"way-to-go","fantastic!":"fantastic","spidey style!":"spidey-style","high five, hero!":"high-five-hero","level complete! amazing!":"level-complete-amazing","level complete! you did it!":"level-complete-you-did-it","level complete! so awesome!":"level-complete-so-awesome","level complete! super hero!":"level-complete-super-hero","yeah! you saved the day!":"yeah-you-saved-the-day","red and blue!":"red-and-blue","black and white!":"black-and-white","red and black!":"red-and-black","all black!":"all-black","white, pink and blue!":"white-pink-and-blue","black and red!":"black-and-red","all red!":"all-red","new suit! red and blue!":"new-suit-red-and-blue","black web!":"black-web","new suit! black web!":"new-suit-black-web","hoodie hero!":"hoodie-hero","new suit! hoodie hero!":"new-suit-hoodie-hero","red merc!":"red-merc","new suit! red merc!":"new-suit-red-merc","dark goo!":"dark-goo","new suit! dark goo!":"new-suit-dark-goo","new hero! ghost web!":"new-hero-ghost-web","new hero! night spider!":"new-hero-night-spider","new hero! red ninja!":"new-hero-red-ninja","new hero! skull guard!":"new-hero-skull-guard","today is the city's big birthday party!":"today-is-the-citys-big-birthday-party","but oh no! the bad guys took all the party stuff!":"but-oh-no-the-bad-guys-took-all-the-part","swipe to shoot webs. spidey attack!":"swipe-to-shoot-webs-spidey-attack","last big battle! you can do it!":"last-big-battle-you-can-do-it","sprinkles are back! yippee!":"sprinkles-are-back-yippee","candles are back! awesome!":"candles-are-back-awesome","cupcakes are back! yay!":"cupcakes-are-back-yay","ice cream is back! so cool!":"ice-cream-is-back-so-cool","balloons are back! woo hoo!":"balloons-are-back-woo-hoo","the party drum is back! way to go!":"the-party-drum-is-back-way-to-go","presents are back! amazing!":"presents-are-back-amazing","the cake is back! party time!":"the-cake-is-back-party-time","happy birthday, city!":"happy-birthday-city","everybody gets cake! dance party!":"everybody-gets-cake-dance-party","the end! yay! you did it!":"the-end-yay-you-did-it"};
+const VOICE_BASE='voice/';
+const vKey=t=>String(t).trim().toLowerCase().replace(/\s+/g,' ');
+let vG=null,vBuf={},vLoad={},vBad={},vCur=null,vSeq=0,vEndAt=0;
+function vLog(t,how){try{if(window.__vlog)window.__vlog.push({t,how,at:Math.round(performance.now())});}catch(e){}}
+function vAB(b){const s=atob(b),u=new Uint8Array(s.length);for(let i=0;i<s.length;i++)u[i]=s.charCodeAt(i);return u.buffer;}
+function vDecode(ab){return new Promise((res,rej)=>{try{const p=AC.decodeAudioData(ab,res,rej);if(p&&p.then)p.then(res,rej);}catch(e){rej(e);}});}
+function vGet(s){if(vBuf[s])return Promise.resolve(vBuf[s]);if(vLoad[s])return vLoad[s];
+  const B=typeof VOICE_B64!=='undefined'?VOICE_B64:null;
+  const raw=B?(B[s]?Promise.resolve().then(()=>vAB(B[s])):Promise.reject(new Error('no clip '+s))):fetch(VOICE_BASE+s+'.mp3').then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.arrayBuffer();});
+  const p=raw.then(vDecode).then(b=>{vBuf[s]=b;delete vLoad[s];return b;});
+  p.catch(e=>{delete vLoad[s];vBad[s]=1;try{console.warn('voice clip',s,e&&e.message);}catch(x){}});return vLoad[s]=p;}
+function voicePreload(){if(vG||!AC)return;try{vG=AC.createGain();vG.gain.value=1;vG.connect(master);}catch(e){vG=null;return;}
+  const first=['spidey-attack','today-is-the-citys-big-birthday-party','but-oh-no-the-bad-guys-took-all-the-part','swipe-to-shoot-webs-spidey-attack'];
+  const q=[...new Set(first.concat(Object.values(VOICE_CLIPS)))];let i=0;const next=()=>{if(i<q.length)vGet(q[i++]).catch(()=>{}).then(next);};next();next();next();}
+function voiceBusy(){return !!vCur&&performance.now()<vEndAt;}
+function vStop(){vSeq++;if(vCur){for(const s of vCur)try{s.onended=null;s.stop();}catch(e){}vCur=null;}vEndAt=0;}
+function voiceCancel(){vStop();try{speechSynthesis.cancel();}catch(e){}}
+function vStart(slugs,onend,seq,text){if(seq!==vSeq||muted)return;let t=AC.currentTime+.02;const srcs=[];
+  slugs.forEach((s,i)=>{const b=vBuf[s],n=AC.createBufferSource();n.buffer=b;n.connect(vG);n.start(t);t+=b.duration+(i<slugs.length-1?.14:0);srcs.push(n);});
+  const dur=t-AC.currentTime;vCur=srcs;vEndAt=performance.now()+dur*1000;lastSay=performance.now();musDuck(dur+.35);vLog(text,'clip');
+  srcs[srcs.length-1].onended=()=>{if(seq!==vSeq)return;vCur=null;vEndAt=0;if(onend)onend();};}
+// returns true when the clip path takes the line (it may still fall back to speech if the clip is slow or broken)
+function sayClip(parts,onend,fallback){const slugs=parts.map(p=>VOICE_CLIPS[vKey(p)]);const text=parts.join(' ');
+  if(!slugs.every(Boolean)){vLog(text,'miss');return false;}
+  if(!AC||!vG||slugs.some(s=>vBad[s]))return false;
+  vStop();try{speechSynthesis.cancel();}catch(e){}const seq=vSeq;
+  if(slugs.every(s=>vBuf[s])){vStart(slugs,onend,seq,text);return true;}
+  // still decoding (only right after the first tap): wait a moment, else use the browser voice for this line
+  Promise.race([Promise.all(slugs.map(vGet)),new Promise((_,rej)=>setTimeout(()=>rej(new Error('slow')),900))])
+    .then(()=>vStart(slugs,onend,seq,text),()=>{if(seq===vSeq&&!muted){vLog(text,'tts');fallback();}});
+  return true;}
+function sayTTS(t){musDuck(.5+t.length*.07);try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);if(voice){u.voice=voice;u.lang=voice.lang;}else u.lang='en-US';u.pitch=1.4;u.rate=1.05;u.volume=1;speechSynthesis.speak(u);}catch(e){}}
+function say(t,force){if(muted)return;const n=performance.now();if(!force&&(n-lastSay<1500||voiceBusy()))return;lastSay=n;
+  const parts=(Array.isArray(t)?t:[t]).filter(Boolean),text=parts.join(' ');if(!parts.length)return;
+  if(sayClip(parts,null,()=>sayTTS(text)))return;vLog(text,'tts');sayTTS(text);}
 // ===== learning words (narrator + small numerals only; never changes aiming, hits, enemies or stars) =====
 // a waiting line plays only once the last line has had time to finish, so nothing piles up or gets cut off
 const EDU_N=['zero','one','two','three','four','five','six','seven','eight','nine','ten'];
@@ -162,19 +203,19 @@ function eduTick(){
     eduPrevN=n;
   }
   if(eduP){const n=performance.now();if(n>eduP.until)eduP=null;
-    else if(n-lastSay>1300){const t=[eduP.count,eduP.left,eduP.misc].filter(Boolean).slice(0,2).join(' ');eduP=null;if(t)say(t,true);}}
+    else if(n-lastSay>1300&&!voiceBusy()){const t=[eduP.count,eduP.left,eduP.misc].filter(Boolean).slice(0,2);eduP=null;if(t.length)say(t,true);}}
 }
 setInterval(eduTick,100);
 function eduComboHit(k,x,y){eduNums.push({n:k+1,x,y,t:performance.now()});if(eduNums.length>9)eduNums.shift();}
 function eduComboEnd(){const n=performance.now();if(n-eduLastCombo<6000)return;eduLastCombo=n;eduSay('left',cheer(PRAISE),2500);}
-function eduCrawl(dir,pop){const n=performance.now();if(pop||n-eduLastCrawl<3500)return;eduLastCrawl=n;if(n-lastSay>1300)say(dir<0?'Up!':'Down!');}
+function eduCrawl(dir,pop){const n=performance.now();if(pop||n-eduLastCrawl<3500)return;eduLastCrawl=n;if(n-lastSay>1300&&!voiceBusy())say(dir<0?'Up!':'Down!');}
 function eduBox(){const n=performance.now();if(n-eduLastBox<5000)return;eduLastBox=n;eduSay('misc','Brown box!',2000);}
 function eduDraw(){const n=performance.now();
   for(const e of eduNums){const a=(n-e.t)/700;if(a>=1)continue;const s=Math.min(1,a*7);cx.save();cx.globalAlpha=1-a*a;cx.translate(e.x+(e.n-2)*34,e.y-62-a*30);cx.scale(s,s);
     cx.font='900 34px system-ui,sans-serif';cx.textAlign='center';cx.textBaseline='middle';cx.lineWidth=7;cx.strokeStyle='#1e4fc2';cx.strokeText(e.n,0,0);cx.fillStyle='#fff';cx.fillText(e.n,0,0);cx.restore();}}
 function eduDrawHud(){if(!eduLeft||L.boss)return;const a=(performance.now()-eduLeft.t)/1400;if(a>=1)return;const s=Math.min(1,a*6)*(1+.15*Math.sin(a*12));
   cx.save();cx.globalAlpha=a<.7?1:1-(a-.7)/.3;cx.translate(VW/2,92);cx.scale(s,s);circ(0,0,30,'#6b3fa0');cx.fillStyle='#fff';cx.font='900 38px system-ui,sans-serif';cx.textAlign='center';cx.textBaseline='middle';cx.fillText(eduLeft.n,0,2);cx.restore();}
-function toggleMute(){muted=!muted;try{if(master)master.gain.setTargetAtTime(muted?0:.9,AC.currentTime,.02);if(muted)speechSynthesis.cancel();}catch(e){}if(!muted)sfx('click');}
+function toggleMute(){muted=!muted;try{if(master)master.gain.setTargetAtTime(muted?0:.9,AC.currentTime,.02);if(muted)voiceCancel();}catch(e){}if(!muted)sfx('click');}
 // ===== progress (location.hash) =====
 // v2: #p=level,heroMask,hero,stars(24 digits),2   old links (#p=level,suitsMask,suit,stars(12)) still load and are converted
 const SUITS=['Red and Blue','Black Web','Hoodie Hero','Red Merc','Dark Goo','Ghost Web','Night Spider','Red Ninja','Skull Guard'];
@@ -1604,8 +1645,8 @@ function playStory(lines,o,then){story={lines,o:o||{},then,i:-1,lt:0};go('story'
 function nextLine(){const S=story;if(!S)return;S.i++;S.lt=0;S.done=false;if(S.i>=S.lines.length){endStory();return;}
   const ln=S.lines[S.i],me=S;S.spoke=sayAs(ln[1],whoVoice(ln[0],S.o),()=>{if(story===me&&!me.done){me.done=true;me.doneAt=me.lt;}});
   if(ln[0]==='villain'&&S.i>0&&S.lines[S.i-1][0]!=='villain')sfx('boing');}
-function endStory(){const f=story&&story.then;story=null;try{speechSynthesis.cancel();}catch(e){}if(f)f();}
-function storyTap(){if(story&&story.lt>.3){sfx('click');try{speechSynthesis.cancel();}catch(e){}nextLine();}}
+function endStory(){const f=story&&story.then;story=null;voiceCancel();if(f)f();}
+function storyTap(){if(story&&story.lt>.3){sfx('click');voiceCancel();nextLine();}}
 function storyTick(dt){const S=story;if(!S)return;S.lt+=dt;const ln=S.lines[S.i];if(!ln)return;
   const v=VOX[whoVoice(ln[0],S.o)]||VOX.narr,est=Math.min(9,1.4+ln[1].split(' ').length*.42/v.r);
   // a voice that 'ends' instantly means speech is not available: then wait the reading time instead
@@ -1822,7 +1863,7 @@ const SWIPEMIN=15; // screen px
 // ===== input =====
 let aim=null,pid=null,firstDone=false;
 function vpt(e){return{x:(e.clientX-ox)/sc,y:(e.clientY-oy)/sc};}
-function firstTap(){initAudio();if(firstDone)return;firstDone=true;if(scr==='title')setTimeout(()=>say('Spidey Attack!',true),150);
+function firstTap(){initAudio();voicePreload();if(firstDone)return;firstDone=true;if(scr==='title')setTimeout(()=>say('Spidey Attack!',true),150);
   try{const de=document.documentElement,rq=de.requestFullscreen||de.webkitRequestFullscreen;if(rq&&document.fullscreenEnabled!==false&&!document.fullscreenElement){const p=rq.call(de,{navigationUI:'hide'});
     const lk=()=>{try{const q=screen.orientation&&screen.orientation.lock&&screen.orientation.lock('landscape');if(q&&q.catch)q.catch(()=>{});}catch(e){}};
     if(p&&p.then)p.then(lk).catch(()=>{});else lk();}}catch(e){}}

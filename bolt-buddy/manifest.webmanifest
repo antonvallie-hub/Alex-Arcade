@@ -1,0 +1,18 @@
+{
+  "id": "./",
+  "name": "Bolt Buddy",
+  "short_name": "Bolt Buddy",
+  "description": "Talk to Bolt, your robot buddy, and play Bolt Gobble, Rocket Ride and Mega Bot Hero!",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#2a1d78",
+  "theme_color": "#2a1d78",
+  "icons": [
+    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+    {"src": "maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable"},
+    {"src": "maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}

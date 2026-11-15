@@ -34,7 +34,7 @@ main{position:relative;padding:max(14px,env(safe-area-inset-top)) max(14px,env(s
 .tile{--s:min(41vw,300px);width:var(--s);height:var(--s);border-radius:22%;display:block;position:relative;
   box-shadow:0 0 0 4px rgba(255,255,255,.85),0 0 0 9px var(--c),0 16px 30px rgba(0,0,0,.5);
   transition:transform .12s ease;touch-action:manipulation;animation:pop .5s cubic-bezier(.3,1.6,.5,1) backwards}
-.tile:nth-child(2){animation-delay:.08s}.tile:nth-child(3){animation-delay:.16s}.tile:nth-child(4){animation-delay:.24s}.tile:nth-child(5){animation-delay:.32s}
+.tile:nth-child(2){animation-delay:.08s}.tile:nth-child(3){animation-delay:.16s}.tile:nth-child(4){animation-delay:.24s}.tile:nth-child(5){animation-delay:.32s}.tile:nth-child(6){animation-delay:.4s}
 .tile img{width:100%;height:100%;border-radius:22%;display:block;pointer-events:none}
 .tile:active,.tile.go{transform:scale(.9) rotate(-2deg)}
 @keyframes pop{from{transform:scale(.3);opacity:0}to{transform:scale(1);opacity:1}}
@@ -56,6 +56,7 @@ main{position:relative;padding:max(14px,env(safe-area-inset-top)) max(14px,env(s
     <a class="tile" href="hero-race/" aria-label="Hero Race" style="--c:#1e88e5"><img src="hero-race/icon-512.png" alt="Hero Race" draggable="false"></a>
     <a class="tile" href="bullseye-blast/" aria-label="Bullseye Blast!" style="--c:#3fa9f5"><img src="bullseye-blast/icon-512.png" alt="Bullseye Blast!" draggable="false"></a>
     <a class="tile" href="turbo-toy-racers/" aria-label="Turbo Toy Racers" style="--c:#e8202a"><img src="turbo-toy-racers/icon-512.png" alt="Turbo Toy Racers" draggable="false"></a>
+    <a class="tile" href="bolt-buddy/" aria-label="Bolt Buddy" style="--c:#4da6ff"><img src="bolt-buddy/icon-512.png" alt="Bolt Buddy" draggable="false"></a>
   </nav>
 </main>
 <script>

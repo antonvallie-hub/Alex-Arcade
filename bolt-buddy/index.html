@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#2a1d78">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="screen-orientation" content="landscape">
+<title>Bolt Buddy</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="Bolt Buddy">
+<style>
+html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#05030f;overscroll-behavior:none;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+body{position:fixed;inset:0;font-family:"Arial Rounded MT Bold","Nunito",system-ui,sans-serif}
+canvas{display:block;touch-action:none;position:absolute;left:0;top:0}
+#parent{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(10,5,40,.8);z-index:5;touch-action:auto;-webkit-user-select:text;user-select:text}
+#parent .card{background:#fff;color:#2a2060;border-radius:22px;padding:22px 26px;width:min(560px,92vw);max-height:92vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+#parent h2{margin:0 0 10px;font-size:22px}#parent label{display:block;font-weight:700;margin:12px 0 4px}
+#parent input[type=text]{width:100%;box-sizing:border-box;font-size:20px;padding:10px 12px;border:2px solid #c9c2ff;border-radius:12px}
+#parent .row{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}#parent button{font-size:18px;padding:10px 18px;border-radius:12px;border:0;background:#6a4fe0;color:#fff;font-weight:700}
+#parent button.alt{background:#eee;color:#2a2060}#parent p{font-size:14px;line-height:1.4;color:#554c8a;margin:8px 0}
+</style>
+</head><body>
+<canvas id="c"></canvas>
+<div id="parent"><div class="card">
+<h2>Parent corner</h2>
+<label for="pKid">Child's name (Bolt says "Hi ...!")</label><input id="pKid" type="text" maxlength="16" autocomplete="off">
+<label for="pBot">Robot's name</label><input id="pBot" type="text" maxlength="16" autocomplete="off">
+<label><input id="pAll" type="checkbox"> Unlock all colors and hats</label>
+<p id="pStats"></p><p id="pMic"></p>
+<p>Privacy: the microphone is on only while the big button is held. Speech is matched on this tablet against Bolt's short word list (hi, dance, jump, sing, name, colors, animals, rocket, sleep, joke, the child's name and Bolt). Nothing is recorded, saved or sent anywhere. No ads, no links, no purchases. Progress is saved on this device only.</p>
+<p>Voice clips say "Alex" and "Bolt" only while those names are set; with other names Bolt uses friendly lines without a name.</p>
+<div class="row"><button onclick="closeParent()">Done</button><button class="alt" onclick="resetProgress()">Reset progress</button></div>
+</div></div>
+<script type="application/json" id="clips">{"n_title":["Bolt Buddy!",0.73],"n_gobble":["Bolt Gobble!",1.44],"n_rocket":["Rocket Ride!",0.78],"n_hero":["Mega Bot Hero!",1.0],"n_soon":["Coming soon!",0.72],"n_drag":["Touch and move to gobble!",1.13],"n_hold":["Press and hold to fly up!",1.19],"n_blast":["Ready? Blast off!",1.44],"n_land":["Land on the planet!",0.9],"n_perfect":["Perfect landing!",0.85],"n_tapbonk":["Tap to bonk!",0.81],"n_powerup":["Power up!",0.7],"n_megabot":["Mega Bot!",0.7],"n_bigbot":["Big Bot!",0.77],"n_minibot":["Mini Bot!",0.66],"n_supersize":["Super size!",0.77],"n_megagobble":["Mega gobble!",0.77],"n_starpower":["Star power!",0.75],"n_finalbonk":["Final bonk!",0.75],"n_youdidit":["You did it!",0.68],"n_friends":["Best friends!",0.76],"n_awesome":["Awesome!",0.55],"n_amazing":["Amazing!",0.62],"n_wayto":["Way to go!",0.7],"n_superstar":["Super star!",0.79],"n_hooray":["Hooray!",0.55],"n_woohoo":["Woo hoo!",0.62],"n_levelup":["Level up!",0.66],"n_pickcolor":["Pick a color!",0.7],"n_pickhat":["Pick your hat!",0.68],"n_talk":["Let's talk to Bolt!",0.96],"n_newhat":["New hat!",0.62],"b_hi_alex":["Hi Alex! I missed you!",1.71],"b_hi_1":["Hello hello! Beep beep!",1.71],"b_hi_2":["Hi buddy! Let's play!",1.67],"b_hi_3":["Hi friend! I missed you!",1.76],"b_awake_alex":["Hi Alex! I'm awake!",1.55],"b_awake":["I'm awake! Hi!",1.29],"b_sleepy":["I'm so sleepy. Night night.",1.87],"b_tickle":["Oh! That tickles!",1.48],"b_boop":["Boop! Beep boop!",1.38],"b_wee":["Yippee! This is fun!",1.61],"b_love":["Wow! I love it!",1.44],"b_looking":["Looking good!",0.79],"b_stylish":["So cool!",0.8],"b_bigger":["I'm getting bigger!",0.96],"b_strong":["Power up! I feel so strong!",1.88],"b_holdtalk":["Hold the button and talk to me!",1.46],"b_ears":["My ears are warming up!",1.2],"b_pictures":["Tap the pictures to play with me!",1.6],"b_dance_1":["Dance party! Watch my moves!",1.96],"b_dance_2":["Robot dance! Wiggle wiggle!",1.87],"b_dance_3":["Let's dance! Spin spin spin!",1.96],"b_jump_1":["Jump! Bounce! Bounce!",2.04],"b_jump_2":["Super jump! Wheee!",1.55],"b_jump_3":["Up, up, and away!",1.0],"b_sing_1":["Sing with me! La la la!",1.72],"b_sing_2":["I love singing! Doo doo doo!",1.84],"b_sing_3":["Robot song! Beep beep boop!",1.98],"b_name_bolt":["My name is Bolt, Bolt the robot!",1.9],"b_name_bolt2":["I'm Bolt! Your robot buddy!",1.83],"b_name_gen":["I'm your robot buddy!",1.11],"b_color_1":["I love colors! Look at me!",1.83],"b_color_2":["Look! A rainbow robot!",1.72],"b_color_3":["Red, blue, yellow! So pretty!",1.93],"b_animal_1":["I'm a puppy! Woof! Woof!",2.11],"b_animal_2":["Roar! I'm a robot dinosaur!",1.96],"b_animal_3":["Moo! I'm a robot cow!",1.65],"b_rocket_1":["Rocket blast off! Whoosh!",1.74],"b_rocket_2":["To the moon! Zoom!",1.48],"b_rocket_3":["Let's zoom to space!",1.07],"b_sleep_1":["Night night! Sweet dreams!",1.69],"b_sleep_2":["Time for a robot nap!",1.22],"b_funny_1":["Tickle tickle! That's so silly!",2.01],"b_funny_2":["Boop! I put a noodle on my head!",1.99],"b_funny_3":["Silly robot! My nose goes honk!",2.1],"b_alex_1":["Alex! That's my best friend!",1.88],"b_alex_2":["Alex is awesome!",1.0],"b_alex_3":["Alex, I love playing with you!",1.47],"b_friend_1":["That's my best friend!",1.19],"b_bolt_1":["That's me! Hello!",1.48],"b_bolt_2":["Yes? I'm right here!",1.42],"b_bolt_3":["You called me! Yay!",1.48],"b_huh_1":["Beep boop! Say that again!",1.68],"b_huh_2":["Oops! Please say it again!",1.72],"b_huh_3":["Tell me one more time!",1.18],"b_huh_4":["Beep? Can you say it again?",1.79],"b_huh_5":["Whirr! One more time, please!",1.78],"b_yum":["Yum yum! More bolts!",1.68],"b_gobble":["Gobble gobble! Yum!",1.65],"b_sogood":["You're so good!",0.85],"b_flying":["Wheee! I'm flying!",1.48],"b_stars":["Shiny stars!",0.93],"b_wedid":["Yay! We did it!",1.4],"b_hero":["You're my hero!",0.92],"b_highfive":["High five!",0.77],"b_letsgo":["Mega Bot, let's go!",1.21],"b_gothim":["Bonk! Got him!",1.31],"b_friend":["Jelly King, be my friend!",1.38],"b_bigger2":["Bigger and bigger!",0.88],"j_wobble":["I'm wiggly and wobbly!",1.63],"j_ouch":["Oopsie! That was bouncy!",2.01],"j_friends":["Okay! Let's be friends!",2.03]}</script>
+<script type="application/json" id="grammar">{"hi":["hi","hello","hey","good morning","hi bolt","hello bolt","hey bolt","hi robot"],"dance":["dance","dancing","lets dance","dance party"],"jump":["jump","jumping","jump up","bounce"],"sing":["sing","singing","song","sing a song","music"],"name":["name","your name","what's your name","what is your name","who are you"],"colors":["color","colors","colour","colours","rainbow"],"animals":["animal","animals","dog","doggy","puppy","cat","kitty","dinosaur","cow","lion"],"rocket":["rocket","rockets","space","blast off","fly","spaceship"],"sleep":["sleep","sleepy","night night","good night","goodnight","bedtime","go to sleep"],"funny":["funny","joke","tell me a joke","silly","laugh","tickle","be funny"],"alex":["alex"],"bolt":["bolt","robot","bolt buddy"]}</script>
+<script src="aaa-music.js"></script>
+<script src="js/core.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/bolt.js"></script>
+<script src="js/talk.js"></script>
+<script src="js/gobble.js"></script>
+<script src="js/rocket.js"></script>
+<script src="js/hero.js"></script>
+<script src="js/screens.js"></script>
+<script>if('serviceWorker' in navigator&&!/[?&]nosw/.test(location.search))window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});</script>
+</body></html>

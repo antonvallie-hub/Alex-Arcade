@@ -25,56 +25,99 @@ body{background:
 @keyframes tw{0%,100%{opacity:0;transform:scale(.4)}50%{opacity:.9;transform:scale(1)}}
 main{position:relative;padding:max(14px,env(safe-area-inset-top)) max(14px,env(safe-area-inset-right)) max(28px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left));
   display:flex;flex-direction:column;align-items:center;gap:clamp(14px,3vmin,28px)}
-.logo{width:min(78vw,46vh,440px);aspect-ratio:1;border-radius:13%;overflow:hidden;display:block;
+.logo{width:min(70vw,46vh,440px);aspect-ratio:1;border-radius:13%;overflow:hidden;display:block;
   box-shadow:0 0 0 3px rgba(255,255,255,.12),0 14px 40px rgba(0,0,0,.45),0 0 60px rgba(140,90,255,.45);
   animation:bob 4s ease-in-out infinite}
 .logo img{width:100%;height:100%;display:block}
 @keyframes bob{0%,100%{transform:translateY(0) rotate(-1deg)}50%{transform:translateY(-6px) rotate(1deg)}}
-.grid{display:flex;flex-wrap:wrap;justify-content:center;gap:clamp(14px,3.2vmin,30px);width:100%;max-width:1400px}
-.tile{--s:min(41vw,300px);width:var(--s);height:var(--s);border-radius:22%;display:block;position:relative;
+.grid{display:flex;flex-wrap:wrap;justify-content:center;align-items:stretch;gap:clamp(18px,3.6vmin,34px) clamp(14px,3.2vmin,30px);width:100%;max-width:1400px}
+.game{--s:min(41vw,300px);width:var(--s);display:flex;flex-direction:column;align-items:center;gap:clamp(10px,2.2vmin,16px);
+  color:#fff;text-decoration:none;touch-action:manipulation;animation:pop .5s cubic-bezier(.3,1.6,.5,1) backwards}
+.game:nth-child(2){animation-delay:.08s}.game:nth-child(3){animation-delay:.16s}.game:nth-child(4){animation-delay:.24s}.game:nth-child(5){animation-delay:.32s}.game:nth-child(6){animation-delay:.4s}.game:nth-child(7){animation-delay:.48s}.game:nth-child(8){animation-delay:.56s}
+.tile{width:var(--s);height:var(--s);border-radius:22%;display:block;position:relative;flex:none;
   box-shadow:0 0 0 4px rgba(255,255,255,.85),0 0 0 9px var(--c),0 16px 30px rgba(0,0,0,.5);
-  transition:transform .12s ease;touch-action:manipulation;animation:pop .5s cubic-bezier(.3,1.6,.5,1) backwards}
-.tile:nth-child(2){animation-delay:.08s}.tile:nth-child(3){animation-delay:.16s}.tile:nth-child(4){animation-delay:.24s}.tile:nth-child(5){animation-delay:.32s}.tile:nth-child(6){animation-delay:.4s}
+  transition:transform .12s ease}
 .tile img{width:100%;height:100%;border-radius:22%;display:block;pointer-events:none}
-.tile:active,.tile.go{transform:scale(.9) rotate(-2deg)}
+.game:active .tile,.game.go .tile{transform:scale(.9) rotate(-2deg)}
+.cap{width:100%;display:flex;flex-direction:column;align-items:center;text-align:center;gap:3px;
+  padding:clamp(7px,1.4vmin,11px) clamp(8px,1.6vmin,14px) clamp(8px,1.6vmin,12px);border-radius:18px;
+  background:linear-gradient(180deg,rgba(255,255,255,.14),rgba(255,255,255,.06));
+  box-shadow:inset 0 0 0 2px rgba(255,255,255,.14),inset 0 3px 0 var(--c),0 8px 18px rgba(0,0,0,.28);
+  overflow-wrap:break-word;hyphens:manual;flex:1 0 auto}
+.cap b{font-weight:900;letter-spacing:.01em;line-height:1.1;font-size:clamp(15px,calc(var(--s)*.085),24px);
+  color:#fff;text-shadow:0 2px 0 rgba(0,0,0,.35),0 0 14px var(--c)}
+.cap span{font-weight:600;line-height:1.3;font-size:clamp(12px,calc(var(--s)*.058),16.5px);color:rgba(255,255,255,.86)}
+.snd{position:fixed;z-index:5;top:max(10px,env(safe-area-inset-top));right:max(10px,env(safe-area-inset-right));
+  width:42px;height:42px;border-radius:50%;border:0;padding:0;display:flex;align-items:center;justify-content:center;cursor:pointer;
+  background:rgba(255,255,255,.14);box-shadow:inset 0 0 0 2px rgba(255,255,255,.28),0 6px 16px rgba(0,0,0,.35);
+  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);touch-action:manipulation;transition:transform .12s ease}
+.snd:active{transform:scale(.88)}
+.snd svg{width:22px;height:22px;display:block}
+.snd .off{display:none}.snd.muted .on{display:none}.snd.muted .off{display:block}.snd.muted{background:rgba(0,0,0,.25)}
 @keyframes pop{from{transform:scale(.3);opacity:0}to{transform:scale(1);opacity:1}}
 @media (orientation:landscape){
   main{gap:clamp(10px,2.4vh,22px)}
   .logo{width:min(34vh,30vw,320px)}
-  .tile{--s:min(21vw,50vh,300px)}
+  .game{--s:min(21vw,50vh,300px)}
 }
-@media (prefers-reduced-motion:reduce){.logo,.tile,.sky i{animation:none}.sky i{opacity:.5}}
+@media (max-width:360px){.game{--s:44vw}.cap{padding:6px 6px 8px}}
+@media (prefers-reduced-motion:reduce){.logo,.game,.sky i{animation:none}.sky i{opacity:.5}}
 </style>
 </head>
 <body>
 <div class="sky" aria-hidden="true"></div>
+<button class="snd" id="snd" type="button" aria-label="Music on or off" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="#fff"/><g class="on"><path d="M15.5 9a4 4 0 0 1 0 6"/><path d="M18 6.5a7.5 7.5 0 0 1 0 11"/></g><g class="off"><path d="M16 9.5l5 5M21 9.5l-5 5"/></g></svg></button>
 <main>
   <div class="logo"><img src="logo.webp" alt="Alex's Arcade" draggable="false"></div>
   <nav class="grid">
-    <a class="tile" href="spidey-attack/" aria-label="Spidey Attack!" style="--c:#c8102e"><img src="spidey-attack/icon-512.png" alt="Spidey Attack!" draggable="false"></a>
-    <a class="tile" href="juicy-chop/" aria-label="Juicy Chop!" style="--c:#ffb84d"><img src="juicy-chop/icon-512.png" alt="Juicy Chop!" draggable="false"></a>
-    <a class="tile" href="hero-race/" aria-label="Hero Race" style="--c:#1e88e5"><img src="hero-race/icon-512.png" alt="Hero Race" draggable="false"></a>
-    <a class="tile" href="bullseye-blast/" aria-label="Bullseye Blast!" style="--c:#3fa9f5"><img src="bullseye-blast/icon-512.png" alt="Bullseye Blast!" draggable="false"></a>
-    <a class="tile" href="turbo-toy-racers/" aria-label="Turbo Toy Racers" style="--c:#e8202a"><img src="turbo-toy-racers/icon-512.png" alt="Turbo Toy Racers" draggable="false"></a>
-    <a class="tile" href="bolt-buddy/" aria-label="Bolt Buddy" style="--c:#4da6ff"><img src="bolt-buddy/icon-512.png" alt="Bolt Buddy" draggable="false"></a>
+    <a class="game" href="spidey-attack/" aria-label="Spidey Attack! Swing, punch and shoot webs to save the city from silly villains!" style="--c:#c8102e"><span class="tile"><img src="spidey-attack/icon-512.png" alt="" draggable="false"></span><span class="cap"><b>Spidey Attack!</b><span>Swing, punch and shoot webs to save the city from silly villains!</span></span></a>
+    <a class="game" href="juicy-chop/" aria-label="Juicy Chop! Swipe to slice flying fruit into big, juicy splashes and learn fruit names!" style="--c:#ffb84d"><span class="tile"><img src="juicy-chop/icon-512.png" alt="" draggable="false"></span><span class="cap"><b>Juicy Chop!</b><span>Swipe to slice flying fruit into big, juicy splashes and learn fruit names!</span></span></a>
+    <a class="game" href="hero-race/" aria-label="Hero Race Switch to the right hero for roads, water, sky and caves to win!" style="--c:#1e88e5"><span class="tile"><img src="hero-race/icon-512.png" alt="" draggable="false"></span><span class="cap"><b>Hero Race</b><span>Switch to the right hero for roads, water, sky and caves to win!</span></span></a>
+    <a class="game" href="bullseye-blast/" aria-label="Bullseye Blast! Tap the pop-up targets for big booms, bright stars and boss battles!" style="--c:#3fa9f5"><span class="tile"><img src="bullseye-blast/icon-512.png" alt="" draggable="false"></span><span class="cap"><b>Bullseye Blast!</b><span>Tap the pop-up targets for big booms, bright stars and boss battles!</span></span></a>
+    <a class="game" href="turbo-toy-racers/" aria-label="Turbo Toy Racers Hold GO and zoom toy cars past the Mega Crusher to win!" style="--c:#e8202a"><span class="tile"><img src="turbo-toy-racers/icon-512.png" alt="" draggable="false"></span><span class="cap"><b>Turbo Toy Racers</b><span>Hold GO and zoom toy cars past the Mega Crusher to win!</span></span></a>
+    <a class="game" href="bolt-buddy/" aria-label="Bolt Buddy Talk to Bolt the friendly robot, then play rocket and snack games together!" style="--c:#4da6ff"><span class="tile"><img src="bolt-buddy/icon-512.png" alt="" draggable="false"></span><span class="cap"><b>Bolt Buddy</b><span>Talk to Bolt the friendly robot, then play rocket and snack games together!</span></span></a>
   </nav>
 </main>
+<script src="aaa-music.js"></script>
 <script>
 (function(){
   var sky=document.querySelector('.sky'),cols=['#ffd23f','#7cf','#ff7ac6','#9f7bff','#fff'];
   for(var i=0;i<34;i++){var s=document.createElement('i');s.style.left=(Math.random()*100)+'%';s.style.top=(Math.random()*100)+'%';
     s.style.color=cols[i%5];s.style.background=cols[i%5];s.style.animationDelay=(Math.random()*3.2)+'s';var z=3+Math.random()*5;s.style.width=s.style.height=z+'px';sky.appendChild(s);}
   document.addEventListener('contextmenu',function(e){e.preventDefault();});
-  var ac=null;
-  function blip(){try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();var t=ac.currentTime,o=ac.createOscillator(),g=ac.createGain();
+  var ac=null,M=null,music=null,MK='arcade-hub-muted',muted=false;
+  try{muted=localStorage.getItem(MK)==='1';}catch(e){}
+  var snd=document.getElementById('snd');
+  function paintSnd(){snd.classList.toggle('muted',muted);snd.setAttribute('aria-pressed',muted?'false':'true');}
+  paintSnd();
+  function audio(){
+    try{
+      if(!ac){ac=new (window.AudioContext||window.webkitAudioContext)();
+        music=ac.createGain();music.gain.value=1;music.connect(ac.destination);
+        if(window.AAAMusic)M=AAAMusic.create(ac,music,{vol:0.34,tracks:{hub:{url:'music/arcade-hub-aaa.mp3',loopStart:3.75,loopEnd:48.75}}});}
+      if(ac.state==='suspended')ac.resume();
+    }catch(e){}
+    return ac;}
+  function startMusic(){if(muted||leaving)return;audio();if(M)M.play('hub',{fadeIn:1.5});}
+  var leaving=false;
+  function blip(){try{audio();var t=ac.currentTime,o=ac.createOscillator(),g=ac.createGain();
     o.type='triangle';o.frequency.setValueAtTime(520,t);o.frequency.exponentialRampToValueAtTime(1200,t+.12);
     g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.25,t+.02);g.gain.exponentialRampToValueAtTime(.0001,t+.18);
     o.connect(g);g.connect(ac.destination);o.start(t);o.stop(t+.2);}catch(e){}}
-  [].forEach.call(document.querySelectorAll('.tile'),function(a){
-    a.addEventListener('click',function(e){e.preventDefault();if(a.classList.contains('go'))return;a.classList.add('go');blip();
+  // music starts on the first tap anywhere that is not a game tile (browsers block autoplay)
+  document.addEventListener('pointerdown',function(e){if(e.target.closest&&(e.target.closest('.game')||e.target.closest('#snd')))return;startMusic();},true);
+  snd.addEventListener('click',function(e){e.preventDefault();
+    if(!muted&&(!M||(!M.playing()&&!M.want()))){startMusic();return;} // first tap on the button starts the music instead of muting
+    muted=!muted;try{localStorage.setItem(MK,muted?'1':'0');}catch(x){}paintSnd();
+    if(muted){if(M)M.stop(0.4);}else startMusic();});
+  document.addEventListener('visibilitychange',function(){if(!ac)return;if(document.hidden)ac.suspend();else if(!leaving)ac.resume();});
+  [].forEach.call(document.querySelectorAll('.game'),function(a){
+    a.addEventListener('click',function(e){e.preventDefault();if(a.classList.contains('go'))return;a.classList.add('go');leaving=true;if(M)M.stop(0.18);blip();
       setTimeout(function(){location.href=a.getAttribute('href');},170);});
   });
-  window.addEventListener('pageshow',function(){[].forEach.call(document.querySelectorAll('.tile.go'),function(a){a.classList.remove('go');});});
+  window.addEventListener('pageshow',function(e){leaving=false;[].forEach.call(document.querySelectorAll('.game.go'),function(a){a.classList.remove('go');});
+    if(e.persisted&&ac&&!muted){ac.resume();startMusic();}});
+  window.__hub={playing:function(){return M?M.playing():null;},muted:function(){return muted;},ctx:function(){return ac?ac.state:null;}}; // test hook
   if('serviceWorker' in navigator)window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});
 })();
 </script>

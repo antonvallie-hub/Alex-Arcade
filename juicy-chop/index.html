@@ -764,7 +764,7 @@ function drawTrails(){
         
         for(let i=1;i<n;i++){const a=pts[i-1],b=pts[i];const k=i/n;let ox=0,oy=0;
           if(off){const dx=b.x-a.x,dy=b.y-a.y,l=Math.hypot(dx,dy)||1;ox=-dy/l*off*L.fr*0.4;oy=dx/l*off*L.fr*0.4;}
-          const wd=w.w*2.2*(L.fr/60)*Math.sqrt(k)*(w.style==='laser'?(0.85+Math.random()*0.3):1);
+          const wd=w.w*2.8*(L.fr/60)*Math.sqrt(k)*(w.style==='laser'?(0.85+Math.random()*0.3):1);
           let col=pass===0?w.glow:w.core;if(w.style==='rainbow'&&pass===0)col=RAINBOW[(i+Math.floor(clock*12))%7];
           if(w.style==='dash'&&pass===1&&i%2)continue;
           ctx.strokeStyle=col;ctx.globalAlpha=pass===0?0.62*k:0.98*k;ctx.lineWidth=pass===0?wd*2.2:wd*0.8;
@@ -773,7 +773,7 @@ function drawTrails(){
     ctx.globalAlpha=1;
     // weapon held at the fingertip
     if(pt.down&&(state==='play'||state==='title')){const b=pts[n-1],a=pts[Math.max(0,n-4)];const ang=Math.atan2(b.y-a.y,b.x-a.x);
-      drawImgFit(IMG['w_'+w.k],b.x,b.y,L.fr*2.6,ang+Math.PI/4,1,1,0.95);}}
+      drawImgFit(IMG['w_'+w.k],b.x,b.y,L.fr*3.6,ang+Math.PI/4,1,1,0.95);}}
   ctx.globalAlpha=1;}
 function drawPopups(){for(const p of popups){const t=p.t;const sc=t<0.18?t/0.18*1.25:1.25-Math.min(0.25,(t-0.18)*1.5);const a=t>0.9?1-(t-0.9)/0.4:1;
   ctx.globalAlpha=Math.max(0,a);

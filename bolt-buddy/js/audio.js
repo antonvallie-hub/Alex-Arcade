@@ -1,6 +1,6 @@
 'use strict';
 // Bolt Buddy audio: WebAudio master bus, synthesized UI sounds, voice clips (narrator + Bolt + Jelly King), AAA music loops.
-let AC = null, voxAn = null, sfxUntil = 0, master = null, musG = null, sfxG = null, voxG = null, M = null, muted = false;
+let AC = null, voxAn = null, sfxUntil = 0, master = null, musG = null, musDuckG = null, sfxG = null, voxG = null, M = null, muted = false;
 const MUSIC = { // loop points from /workspace/work/music-aaa/ship_bolt.py (music.json)
   space: { url: 'music/bolt-space-aaa.mp3', loopStart: 7.741927, loopEnd: 61.935488 },
   gobble: { url: 'music/bolt-gobble-aaa.mp3', loopStart: 4.210522, loopEnd: 37.894739 },
@@ -11,7 +11,9 @@ function initAudio() {
   try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
   const comp = AC.createDynamicsCompressor(); comp.threshold.value = -10; comp.ratio.value = 4; comp.attack.value = .003; comp.release.value = .2;
   master = AC.createGain(); master.gain.value = .9; master.connect(comp); comp.connect(AC.destination);
-  musG = AC.createGain(); musG.gain.value = .55; musG.connect(master);
+  // music chain: track -> musG (scene level x parent setting) -> musDuckG (talk-screen ducking) -> master
+  musDuckG = AC.createGain(); musDuckG.gain.value = 1; musDuckG.connect(master);
+  musG = AC.createGain(); musG.gain.value = musLevel(musScene()); musG.connect(musDuckG); MZ.lv = musG.gain.value;
   sfxG = AC.createGain(); sfxG.gain.value = .7; sfxG.connect(master);
   voxG = AC.createGain(); voxG.gain.value = 1.0; voxG.connect(master);
   voxAn = AC.createAnalyser(); voxAn.fftSize = 512; voxAn.smoothingTimeConstant = .2; voxG.connect(voxAn); // mouth sync
@@ -19,6 +21,33 @@ function initAudio() {
   if (wantMusic) M.play(wantMusic, { fade: 1 });
 }
 let wantMusic = null;
+// ===== music levels (v2.1: quieter so Bolt and Alex can hear each other) =====
+// gains are linear on the music bus (the v2.0 levels were: everywhere .55 (-5.2 dB), talk screen with mic on .14 (-17.1 dB), voice duck x.35).
+// Parent corner "Music volume": off / low (default) / medium.
+const MUS_LV = { off: { base: 0, game: 0, talk: 0 }, low: { base: .30, game: .30, talk: .03 }, medium: { base: .42, game: .42, talk: .06 } };
+// talk-screen ducking on top of the talk bed: bed when no one is talking / mic off, quieter while the mic is open,
+// near-silent while Alex is talking, under Bolt's voice while he speaks
+const MUS_DUCK = { bed: 1, listen: .3, hear: .08, bolt: .5 };
+const MZ = { scene: 'base', duck: 'bed', lv: 0, dk: 1, log: [] };   // current targets (read by tests / debug)
+const GAME_SCR = { gobble: 1, rocket: 1, hero: 1 };
+function musSetting() { const v = (typeof SV !== 'undefined' && SV.music) || 'low'; return MUS_LV[v] ? v : 'low'; }
+function musScene() { const s = typeof scr !== 'undefined' ? scr : 'title'; return s === 'talk' ? 'talk' : GAME_SCR[s] ? 'game' : 'base'; }
+function musLevel(scene) { return MUS_LV[musSetting()][scene]; }
+const toDb = g => g > 0 ? +(20 * Math.log10(g)).toFixed(1) : -120;
+// called every frame: scene level follows the screen + setting; duck follows who is talking. Changes ramp smoothly:
+// ducking down is quick (Alex's first word), coming back up is slow and gentle (a fade, never a jump the mic could mistake for a voice)
+function musicTick(duck) {
+  if (!AC || !musG) return;
+  const scene = musScene(), lv = musLevel(scene), dk = MUS_DUCK[duck] != null ? MUS_DUCK[duck] : 1, t = AC.currentTime;
+  if (lv !== MZ.lv) { musG.gain.setTargetAtTime(lv, t, scene === MZ.scene ? .25 : .5); MZ.lv = lv; }
+  MZ.scene = scene;
+  if (dk !== MZ.dk) {
+    const down = dk < MZ.dk; musDuckG.gain.cancelScheduledValues(t); musDuckG.gain.setValueAtTime(musDuckG.gain.value, t);
+    musDuckG.gain.setTargetAtTime(dk, t, down ? (duck === 'hear' ? .04 : .12) : (duck === 'bed' ? .8 : .5));
+    MZ.dk = dk; MZ.duck = duck; MZ.log.push([Math.round(now()), duck]); if (MZ.log.length > 60) MZ.log.shift();
+  }
+}
+function musicInfo() { return { setting: musSetting(), scene: MZ.scene, duck: MZ.duck, target: +(MZ.lv * MZ.dk).toFixed(4), targetDb: toDb(MZ.lv * MZ.dk), scene_gain: musG ? +musG.gain.value.toFixed(4) : null, duck_gain: musDuckG ? +musDuckG.gain.value.toFixed(4) : null, now_gain: musG ? +(musG.gain.value * musDuckG.gain.value).toFixed(4) : null, now_db: musG ? toDb(musG.gain.value * musDuckG.gain.value) : null, log: MZ.log.slice(-20) }; }
 function music(name) { wantMusic = name; if (M) { if (name) M.play(name, { fade: 1.2 }); else M.stop(1); } }
 let NB = null;
 function noiseBuf() { if (NB) return NB; const b = AC.createBuffer(1, AC.sampleRate * 1.5, AC.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; return NB = b; }
@@ -111,7 +140,7 @@ function say(id, o) {
   const secs = CLIPS[id][1];
   vEnd = now() + secs * 1000 + 120; bubble = { text: CLIPS[id][0], who, t0: now(), until: vEnd + 500 };
   if (o.onEnd) vOnEnd = o.onEnd; else vOnEnd = null;
-  if (M) M.duckFor(secs + .2);
+  if (M && (typeof scr === 'undefined' || scr !== 'talk')) M.duckFor(secs + .2);   // the talk screen has its own ducking (musicTick)
   if (!AC || muted) return;
   vGet(id).then(b => {
     if (!vlog.length || vlog[vlog.length - 1] !== id) return;

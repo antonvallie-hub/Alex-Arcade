@@ -49,7 +49,7 @@ function cover(img, x, y, w, h, fx, fy) { // draw image covering the rect (focus
 
 // ===== save =====
 const SAVE_KEY = 'bolt-buddy-v1';
-const DEF = { kid: 'Alex', bot: 'Bolt', color: 0, hat: 0, bolts: 0, fills: 0, total: 0, unlock: { c: 3, h: 4 }, all: false, plays: { gobble: 0, rocket: 0, hero: 0 }, stars: 0, talkMode: 'conv', talkWait: 'normal', debug: false };
+const DEF = { kid: 'Alex', bot: 'Bolt', color: 0, hat: 0, bolts: 0, fills: 0, total: 0, unlock: { c: 3, h: 4 }, all: false, plays: { gobble: 0, rocket: 0, hero: 0 }, stars: 0, talkMode: 'conv', talkWait: 'normal', debug: false, music: 'low' };
 let SV = JSON.parse(JSON.stringify(DEF));
 function loadSave() { try { const p = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (p) SV = Object.assign(JSON.parse(JSON.stringify(DEF)), p); } catch (e) {} }
 function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(SV)); } catch (e) {} }

@@ -251,8 +251,12 @@ function openParent() {
   document.getElementById('pKid').value = SV.kid; document.getElementById('pBot').value = SV.bot; document.getElementById('pAll').checked = !!SV.all;
   document.getElementById('pStats').textContent = 'Games played: ' + (SV.plays.gobble + SV.plays.rocket + SV.plays.hero) + ' · Power Core fills: ' + SV.fills + ' · Level: ' + LEVEL_NAMES[level()];
   document.getElementById('pMode').value = SV.talkMode || 'conv'; document.getElementById('pWait').value = SV.talkWait || 'normal'; document.getElementById('pDbg').checked = !!SV.debug;
+  musSeg();
   document.getElementById('pMic').textContent = 'Speech engine: ' + ({ idle: 'not loaded yet', loading: 'downloading (' + Math.round(VOSK.prog * 100) + '%)', ready: 'ready, works offline', failed: 'unavailable (' + VOSK.err + '); picture buttons still work' })[VOSK.state];
 }
+// parent corner "Music volume": custom segmented pills (no native controls); applies right away so a parent can hear it
+function musSeg() { const v = musSetting(); document.querySelectorAll('#pMus button').forEach(b => { const on = b.dataset.v === v; b.classList.toggle('on', on); b.setAttribute('aria-checked', on ? 'true' : 'false'); }); }
+function setMusic(v) { if (!MUS_LV[v]) return; SV.music = v; save(); musSeg(); }
 function closeParent() {
   const k = document.getElementById('pKid').value.trim().slice(0, 16), b = document.getElementById('pBot').value.trim().slice(0, 16);
   SV.kid = k || 'Alex'; SV.bot = b || 'Bolt'; SV.all = document.getElementById('pAll').checked;
@@ -322,7 +326,7 @@ function frame(nw) {
   dtR *= TS; scrT += dtR;
   try {
     ptr.forEach(v => { if (v && v.b && v.b.hold && !v.done && now() - v.t0 > v.b.hold) { v.done = true; v.b.cb(); } });
-    stepCam(dtR); voiceTick();
+    stepCam(dtR); voiceTick(); musicTick(scr === 'talk' ? talkDuck() : 'bed');
     const dt = dtR * (scr === 'hero' ? 1 : CAM.slow);
     if (scr === 'gobble') updateGobble(dt); else if (scr === 'rocket') updateRocket(dt); else if (scr === 'hero') updateHero(dtR); else if (scr === 'talk') updateTalk(dt);
     stepFx(scr === 'hero' ? dtR * CAM.slow : dt);
@@ -346,6 +350,7 @@ async function simMic(url, o) {
   if (!TK.conv) { SV.talkMode = 'conv'; TK.conv = true; recEnsure(); }
   if (!MIC.on) {
     const mix = AC.createGain(); micAttach(mix); MIC.mix = mix; if (o.leak) { TK.leak = mix; voxG.connect(mix); }
+    if (o.music) { TK.mleak = mix; musDuckG.connect(mix); }   // the speaker's music back into the mic too (worst case: no echo cancellation)
     const n = AC.createBufferSource(), nb = AC.createBuffer(1, AC.sampleRate, AC.sampleRate), d = nb.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * .018; // room hiss at the same level as the test WAVs' own hiss (~-40 dBFS)
     n.buffer = nb; n.loop = true; n.connect(mix); n.start();
   }
@@ -363,7 +368,7 @@ window.__bb = {
   go: (s, a) => { initAudio(); go(s, a); }, respond: k => respond(k, 'test'), simMic, startConv: () => startConv(true), micOff: () => { micClose(); TK.conv = false; },
   talk: () => ({ cap: MIC.kind, eng: ENG.state, floor: ENG.floor, mic: MIC.on, conv: TK.conv, asleep: TK.rig.asleep, lat: TK.lat.slice(), heard: TK.heard.slice(), resp: (window.__resp || []).slice(), choice: TK.choice ? TK.choice.ch : null, mem: DLG.mem, busy: botBusy(), ignored: ENG.ignored, turn: TK.turn ? { partial: TK.turn.partial, answered: TK.turn.answered } : null, said: DLG.said.slice() }),
   choiceTap, ask: k => askQuestion(k), dbg: on => dbgShow(on), tapBolt, rig: () => ({ move: TK.rig.move, listening: TK.rig.listening, face: TK.rig.face }), view: () => ({ ox, oy, sc, VW, VH }),
-  reset: () => { SV = JSON.parse(JSON.stringify(DEF)); save(); }, openParent, closeParent, ls: () => LS.lastText,
+  reset: () => { SV = JSON.parse(JSON.stringify(DEF)); save(); }, openParent, closeParent, music: () => musicInfo(), setMusic, ls: () => LS.lastText,
 };
 // ---------------- boot ----------------
 loadSave(); resize(); setTimeout(() => dbgShow(SV.debug), 0);

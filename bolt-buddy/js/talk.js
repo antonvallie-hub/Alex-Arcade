@@ -86,6 +86,7 @@ function micClose() {
   if (MIC.sim) { try { MIC.sim.stop(); } catch (e) {} MIC.sim = null; }
   MIC.stream = null; MIC.src = null; MIC.proc = null; MIC.sink = null; MIC.pre = [];
   if (TK.leak) { try { voxG.disconnect(TK.leak); } catch (e) {} TK.leak = null; }
+  if (TK.mleak) { try { musDuckG.disconnect(TK.mleak); } catch (e) {} TK.mleak = null; }
 }
 const endCapture = micClose;
 function onFrame(d) {
@@ -321,12 +322,12 @@ async function startConv(byTap) {
   if (R.asleep) { R.asleep = false; R.move = null; TK.napUntil = 0; rigAct(R, 'hop', 1, 'surprised'); sfx('chirp'); }
   const ok = MIC.on || await micOpen();
   if (!ok) { say('b_pictures', { interrupt: true }); rigAct(R, 'shake', .8, 'curious'); return; }
-  recEnsure(); TK.conv = true; if (musG) musG.gain.setTargetAtTime(.14, AC.currentTime, .3);
+  recEnsure(); TK.conv = true;
   const c = choose('start'); playReply(R_(c, 'spinHappy', 1.2, 'joy', 'sparkle'));
 }
 function goSleep(said) {
   const R = TK.rig; ENG.sleep(); TK.choice = null;
-  const fin = () => { micClose(); TK.conv = false; if (musG) musG.gain.setTargetAtTime(.55, AC.currentTime, .5); R.asleep = true; rigAct(R, 'sleep', 999, 'asleep'); R.asleep = true; R.sleepSnore = now(); };
+  const fin = () => { micClose(); TK.conv = false; R.asleep = true; rigAct(R, 'sleep', 999, 'asleep'); R.asleep = true; R.sleepSnore = now(); };
   if (said) { setTimeout(fin, 300); return; }
   say(pick(['zz_1', 'zz_2']), { interrupt: true, onEnd: fin }); rigAct(R, 'yawn', 1.8, 'sleepy');
 }
@@ -372,7 +373,7 @@ function enterTalk() {
   const first = !TK.seen; TK.seen = true;
   setTimeout(() => { if (scr !== 'talk') return; if (VOSK.state === 'failed') say('b_pictures'); else say(SV.talkMode === 'hold' ? 'b_holdtalk' : pick(['l_tapme', 'l_tapme2'])); }, first ? 500 : 300);
 }
-function leaveTalk() { micClose(); TK.conv = false; if (musG && AC) musG.gain.setTargetAtTime(.55, AC.currentTime, .3); }
+function leaveTalk() { micClose(); TK.conv = false; }
 function drawIcon(k, x, y, s) {
   cx.save(); cx.translate(x, y); cx.scale(s, s);
   if (k === 'music') { cx.fillStyle = '#fff'; cx.strokeStyle = 'rgba(120,70,0,.5)'; cx.lineWidth = 3; cx.beginPath(); cx.ellipse(-14, 14, 11, 8, -.4, 0, TAU); cx.fill(); cx.stroke(); cx.beginPath(); cx.ellipse(16, 8, 11, 8, -.4, 0, TAU); cx.fill(); cx.stroke(); cx.fillRect(-5, -22, 6, 36); cx.fillRect(25, -28, 6, 36); cx.beginPath(); cx.moveTo(-5, -22); cx.lineTo(31, -28); cx.lineTo(31, -18); cx.lineTo(-5, -12); cx.fill(); }
@@ -398,19 +399,34 @@ function drawRocketIcon() {
   cx.fillStyle = '#ffb21f'; cx.beginPath(); cx.moveTo(-7, 25); cx.lineTo(0, 40); cx.lineTo(7, 25); cx.fill();
   cx.restore();
 }
+// speech bubble: wraps to two balanced lines (shrinking a little only if a line is still too wide) and always stays fully on screen
+function bubbleLines(text, maxTW) {
+  if (cx.measureText(text).width <= maxTW) return [text];
+  const w = text.split(' '); let best = null;
+  for (let k = 1; k < w.length; k++) { const a = w.slice(0, k).join(' '), b = w.slice(k).join(' '), m = Math.max(cx.measureText(a).width, cx.measureText(b).width); if (!best || m < best[0]) best = [m, [a, b]]; }
+  return best ? best[1] : [text];
+}
 function drawBubble(x, y, center) {
   if (!bubble || now() > bubble.until) return;
   const k = clamp((now() - bubble.t0) / 220, 0, 1), sc2 = easeBack(k);
   const isN = bubble.who === 'n';
   let text = bubble.text; if (!isAlex()) text = text.replace(/Alex/g, SV.kid || 'friend');
-  cx.save(); cx.font = '900 26px ' + FONT; const w = Math.min(460, cx.measureText(text).width + 50);
+  const maxW = Math.min(500, VW - 40), pad = 25; let fs = 26;
+  cx.save(); cx.font = '900 ' + fs + 'px ' + FONT;
+  const lines = bubbleLines(text, maxW - pad * 2);
+  let tw = Math.max(...lines.map(l => cx.measureText(l).width));
+  if (tw > maxW - pad * 2) { fs = Math.max(18, Math.floor(fs * (maxW - pad * 2) / tw)); cx.font = '900 ' + fs + 'px ' + FONT; tw = Math.max(...lines.map(l => cx.measureText(l).width)); }
+  const lh = fs * 1.25, w = Math.min(maxW, tw + pad * 2), h = lines.length === 1 ? 60 : Math.round(lh * 2 + 28);
+  const ax = x;                                   // where the tail should point (Bolt's head)
   if (isN) { x = VW / 2 - w / 2; y = 80; } else if (center) x = x - w / 2;
-  x = clamp(x, 10, VW - w - 10);
-  cx.translate(x + w / 2, y + 30); cx.scale(sc2, sc2); cx.translate(-w / 2, -30);
-  cx.fillStyle = 'rgba(0,0,0,.25)'; rr(4, 6, w, 60, 26); cx.fill();
-  cx.fillStyle = isN ? '#ffd23f' : bubble.who === 'j' ? '#ffd9f0' : '#fff'; rr(0, 0, w, 60, 26); cx.fill();
-  if (!isN) { cx.beginPath(); cx.moveTo(30, 52); cx.lineTo(10, 84); cx.lineTo(60, 56); cx.fill(); }
-  txt(text, w / 2, 31, 26, '#2a2060', { stroke: false });
+  x = clamp(x, 10, VW - w - 10); y = clamp(y, 10, VH - h - 40);
+  window.__bubbleRect = { x, y, w, h, lines: lines.length, fs, VW, VH };
+  cx.translate(x + w / 2, y + h / 2); cx.scale(sc2, sc2); cx.translate(-w / 2, -h / 2);
+  const fill = isN ? '#ffd23f' : bubble.who === 'j' ? '#ffd9f0' : '#fff';
+  cx.fillStyle = 'rgba(0,0,0,.25)'; rr(4, 6, w, h, 26); cx.fill();
+  cx.fillStyle = fill; rr(0, 0, w, h, 26); cx.fill();
+  if (!isN) { const tx = clamp(center ? w / 2 - 20 : ax - x + 30, 26, w - 60); cx.beginPath(); cx.moveTo(tx, h - 8); cx.lineTo(tx - 20, h + 24); cx.lineTo(tx + 30, h - 4); cx.fill(); }
+  lines.forEach((l, i) => txt(l, w / 2, h / 2 + (i - (lines.length - 1) / 2) * lh + 1, fs, '#2a2060', { stroke: false }));
   cx.restore();
 }
 function backBtn(cb) {
@@ -419,6 +435,16 @@ function backBtn(cb) {
   BTN.push({ id: 'back', x, y, r: 42, cb: () => { sfx('click'); cb(); } });
 }
 
+// ---------------- music ducking (audio.js musicTick) ----------------
+// hear: Alex is talking (or holding the talk button) -> near-silent; bolt: Bolt/narrator speaking -> under his voice;
+// listen: mic open, waiting for Alex -> quieter than the bed; bed: mic off / asleep -> quiet bed
+function talkDuck() {
+  const T = TK.turn, live = T && !T.answered && (MIC.feeding || T.waitFinal);
+  if (live || MIC.hold || (MIC.on && ENG.state === 'speech')) return 'hear';
+  if (voiceBusy()) return 'bolt';
+  if (MIC.on && TK.conv && !TK.rig.asleep) return 'listen';
+  return 'bed';
+}
 // ---------------- per-frame ----------------
 function updateTalk(dt) {
   const R = TK.rig;

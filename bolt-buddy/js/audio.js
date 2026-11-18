@@ -1,6 +1,6 @@
 'use strict';
 // Bolt Buddy audio: WebAudio master bus, synthesized UI sounds, voice clips (narrator + Bolt + Jelly King), AAA music loops.
-let AC = null, master = null, musG = null, sfxG = null, voxG = null, M = null, muted = false;
+let AC = null, voxAn = null, sfxUntil = 0, master = null, musG = null, sfxG = null, voxG = null, M = null, muted = false;
 const MUSIC = { // loop points from /workspace/work/music-aaa/ship_bolt.py (music.json)
   space: { url: 'music/bolt-space-aaa.mp3', loopStart: 7.741927, loopEnd: 61.935488 },
   gobble: { url: 'music/bolt-gobble-aaa.mp3', loopStart: 4.210522, loopEnd: 37.894739 },
@@ -14,6 +14,7 @@ function initAudio() {
   musG = AC.createGain(); musG.gain.value = .55; musG.connect(master);
   sfxG = AC.createGain(); sfxG.gain.value = .7; sfxG.connect(master);
   voxG = AC.createGain(); voxG.gain.value = 1.0; voxG.connect(master);
+  voxAn = AC.createAnalyser(); voxAn.fftSize = 512; voxAn.smoothingTimeConstant = .2; voxG.connect(voxAn); // mouth sync
   M = AAAMusic.create(AC, musG, { tracks: MUSIC });
   if (wantMusic) M.play(wantMusic, { fade: 1 });
 }
@@ -30,8 +31,11 @@ function noise(dur, vol, ft, f0, f1, q, t0) {
   const g = AC.createGain(); g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + .02); g.gain.exponentialRampToValueAtTime(.0001, t + dur); s.connect(f); f.connect(g); g.connect(sfxG); s.start(t, Math.random()); s.stop(t + dur + .05);
 }
 let combo = 0, comboT = 0;
+// how long each synth sound rings (ms) - the mic ignores everything until it is over, so Bolt never hears his own beeps
+const SFX_MS = { yay: 1700, powerup: 1500, slowmo: 1300, fanfare: 1800, levelup: 1300, snore: 1200, rainbow: 700, grow: 800, whoosh: 700, hum: 1400, giggle: 700 };
 function sfx(n, a) {
   if (!AC || muted) return;
+  sfxUntil = Math.max(sfxUntil, now() + (SFX_MS[n] || 450));
   try {
     switch (n) {
       case 'click': tone('triangle', 520, 1100, .1, .16); break;
@@ -63,6 +67,13 @@ function sfx(n, a) {
       case 'note': { const f = pick([523, 587, 659, 784, 880, 1046]); tone('triangle', f, 0, .25, .1); tone('sine', f * 2, 0, .2, .04); break; }
       case 'woof': tone('sawtooth', 300, 180, .14, .12); noise(.14, .12, 'bandpass', 700, 400, 2); break;
       case 'rainbow': [523, 587, 659, 698, 784, 880, 988, 1046].forEach((f, i) => tone('sine', f, 0, .18, .08, i * .05)); break;
+      case 'hum': { const ns = pick([[523, 659, 784, 659], [587, 784, 880, 784], [659, 523, 587, 784]]); ns.forEach((f, i) => { tone('sine', f, 0, .28, .05, i * .26); tone('triangle', f * 2, 0, .2, .015, i * .26); }); break; }
+      case 'servo': tone('sawtooth', 180 + Math.random() * 60, 260 + Math.random() * 80, .16, .025); break;
+      case 'blip': tone('square', 1200 + Math.random() * 600, 0, .05, .04); break;
+      case 'heart': [784, 988, 1175, 1568].forEach((f, i) => tone('sine', f, f * 1.01, .3, .07, i * .07)); tone('sine', 196, 392, .5, .12); break;
+      case 'squeeze': tone('sine', 300, 600, .25, .12); tone('triangle', 900, 1500, .2, .05, .05); break;
+      case 'land2': tone('sine', 110, 45, .22, .28); noise(.12, .12, 'lowpass', 900, 200, 1); break;
+      case 'flip': noise(.45, .18, 'bandpass', 500, 2400, 3); tone('sine', 300, 900, .4, .08); break;
       case 'honk': tone('square', 330, 300, .25, .1); tone('square', 335, 305, .25, .08); break;
     }
   } catch (e) {}
@@ -70,18 +81,27 @@ function sfx(n, a) {
 
 // ===== voice clips =====
 const CLIPS = JSON.parse(document.getElementById('clips').textContent); // id -> [text, secs]
-const vBuf = {}, vLoad = {};
+const vBuf = {}, vLoad = {}, vRaw = {}, vUse = []; const VBUF_MAX = 90; // decoded clips kept (LRU); raw mp3 bytes kept for all
 let vEnd = 0, vSrc = null, vQ = [], vOnEnd = null; const vlog = []; window.__vlog = vlog;
+function vFetch(id) { if (vRaw[id]) return Promise.resolve(vRaw[id]); return fetch('voice/' + id + '.mp3').then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); }).then(ab => vRaw[id] = ab); }
 function vGet(id) {
-  if (vBuf[id]) return Promise.resolve(vBuf[id]); if (vLoad[id]) return vLoad[id]; if (!AC) return Promise.reject(new Error('no audio'));
-  const p = fetch('voice/' + id + '.mp3').then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); })
-    .then(ab => new Promise((res, rej) => { const q = AC.decodeAudioData(ab, res, rej); if (q && q.then) q.then(res, rej); })).then(b => { vBuf[id] = b; delete vLoad[id]; return b; });
+  if (vBuf[id]) { const i = vUse.indexOf(id); if (i >= 0) vUse.splice(i, 1); vUse.push(id); return Promise.resolve(vBuf[id]); }
+  if (vLoad[id]) return vLoad[id]; if (!AC) return Promise.reject(new Error('no audio'));
+  const p = vFetch(id).then(ab => new Promise((res, rej) => { const q = AC.decodeAudioData(ab.slice(0), res, rej); if (q && q.then) q.then(res, rej); })).then(b => {
+    vBuf[id] = b; delete vLoad[id]; vUse.push(id);
+    while (vUse.length > VBUF_MAX) { const old = vUse.shift(); if (old !== id) delete vBuf[old]; }
+    return b;
+  });
   p.catch(() => { delete vLoad[id]; }); return vLoad[id] = p;
 }
 let vPre = false;
-function voicePreload() { if (vPre || !AC) return; vPre = true; const q = Object.keys(CLIPS); let i = 0; const nx = () => { if (i < q.length) vGet(q[i++]).catch(() => {}).then(nx); }; nx(); nx(); nx(); }
+// first tap: fetch every clip's bytes (small), decode only the ones Bolt says first; talk.js pre-decodes each pool's next line
+function voicePreload() { if (vPre || !AC) return; vPre = true; const q = Object.keys(CLIPS); let i = 0; const nx = () => { if (i < q.length) vFetch(q[i++]).catch(() => {}).then(nx); }; nx(); nx(); nx(); ['n_talk', 'b_hi_alex', 'b_hi_1', 'l_tapme', 'l_start_1', 'l_start_alex'].forEach(id => vGet(id).catch(() => {})); }
 const voiceBusy = () => now() < vEnd;
-let bubble = null; // {text, who, t0, until}
+let bubble = null, vStartT = 0; // {text, who, t0, until}
+const _vd = new Uint8Array(512); let vLevel = 0;
+function voiceLevel() { if (!voxAn || !voiceBusy()) return vLevel = vLevel * .8; voxAn.getByteTimeDomainData(_vd); let m = 0; for (let i = 0; i < _vd.length; i += 4) m = Math.max(m, Math.abs(_vd[i] - 128)); return vLevel = Math.max(m / 70, vLevel * .75); }
+const botBusy = () => voiceBusy() || now() < sfxUntil;
 // say(id, {who, interrupt, onEnd}) - plays a clip, shows a speech bubble, ducks music
 function say(id, o) {
   o = o || {}; if (!CLIPS[id]) return;
@@ -96,7 +116,7 @@ function say(id, o) {
   vGet(id).then(b => {
     if (!vlog.length || vlog[vlog.length - 1] !== id) return;
     const s = AC.createBufferSource(); s.buffer = b; const g = AC.createGain(); g.gain.value = 1; s.connect(g); g.connect(voxG); s.start(); vSrc = s;
-    vEnd = now() + b.duration * 1000 + 80; if (bubble) bubble.until = vEnd + 500;
+    vEnd = now() + b.duration * 1000 + 80; if (bubble) bubble.until = vEnd + 500; vStartT = now(); (window.__vlogT = window.__vlogT || []).push([id, vStartT]); if (o.onStart) o.onStart(vStartT);
   }).catch(() => {});
 }
 function stopVoice() { if (vSrc) { try { vSrc.stop(); } catch (e) {} vSrc = null; } vEnd = 0; }

@@ -10,7 +10,7 @@ const GAMES = [
 const SOON = [{ name: 'Dance Party', icon: 'music', col: '#ff7ac6' }, { name: 'Tower Builder', icon: 'block', col: '#ffa53a' }, { name: 'Peek-a-Bot', icon: 'eyes', col: '#7ad1ff' }];
 let WIN = null;
 function go(s, arg) {
-  if (LS.on) endCapture();
+  if (scr === 'talk' && s !== 'talk') leaveTalk(); else if (MIC.on) micClose();
   scr = s; scrT = 0; BTN = []; FX.length = 0; CAM.slow = 1; CAM.slowT = 0; CAM.flash = 0; clearVoiceQ(); lastInput = now();
   if (s === 'hub') enterHub();
   else if (s === 'talk') enterTalk();
@@ -42,7 +42,7 @@ function drawTitle(dt) {
   const k = easeBack(Math.min(1, scrT / .8));
   drawLogo(VW / 2, 92, k * 1.0);
   const p = rigPose(HUB.rig, dt);
-  if (!HUB.rig.move && Math.random() < dt * .4) rigAct(HUB.rig, pick(['wave', 'hop', 'dance']), 1.6, pick(['joy', 'star']));
+  if (!HUB.rig.move && Math.random() < dt * .08) rigAct(HUB.rig, pick(['wave', 'spinHappy', 'dance', 'backflip', 'hover']), 1.8, pick(['joy', 'star'])); else rigIdleTick(HUB.rig, dt);
   drawBolt({ x: VW / 2, y: 560, s: .8, color: SV.color, hat: SV.hat, face: p.face, pose: p, cape: level() >= 2 });
   const pr = 1 + Math.sin(scrT * 5) * .06;
   glossBall(VW / 2 + 300, 430, 64 * pr, '#5fd45a'); cx.fillStyle = '#fff'; cx.beginPath(); cx.moveTo(VW / 2 + 286, 400); cx.lineTo(VW / 2 + 326, 430); cx.lineTo(VW / 2 + 286, 460); cx.fill();
@@ -66,7 +66,7 @@ function drawHub(dt) {
   drawFx();
   // Bolt on his stage
   const lv = level(), bs = [.8, .87, .94][lv], bx = VW * .43, by = 562;
-  const p = rigPose(R, dt);
+  const p = rigPose(R, dt); rigIdleTick(R, dt);
   glow(bx, by - 10, 170, 'rgba(160,220,255,1)', .35);
   drawBolt({ x: bx, y: by, s: bs, color: SV.color, hat: SV.hat, face: p.face, pose: p, cape: lv >= 2, core: SV.bolts / CORE_CAP, ear: R.ear });
   if (R.asleep && Math.random() < dt * 1.2) fx({ k: 'z', x: bx + 80, y: by - 360 * bs, vx: 30, vy: -50, life: 2, s: 12, c: '#bff' });
@@ -77,7 +77,7 @@ function drawHub(dt) {
   const tx = 150, ty = 222, trr = 80;
   for (let i = 0; i < 2; i++) { const k = ((T * .6) + i / 2) % 1; cx.strokeStyle = 'rgba(255,170,150,' + (.5 * (1 - k)) + ')'; cx.lineWidth = 5; cx.beginPath(); cx.arc(tx, ty, trr + 8 + k * 46, 0, TAU); cx.stroke(); }
   glossBall(tx, ty, trr * (pressed('h_talk') ? .92 : 1 + Math.sin(T * 3) * .02), '#ff4436'); drawIcon('mic', tx, ty + 3, 1.05);
-  BTN.push({ id: 'h_talk', x: tx, y: ty, r: trr + 6, cb: () => { sfx('pop'); say(isBolt() ? 'n_talk' : 'b_holdtalk', { interrupt: true }); go('talk'); } });
+  BTN.push({ id: 'h_talk', x: tx, y: ty, r: trr + 6, cb: () => { sfx('pop'); say(isBolt() ? 'n_talk' : 'l_tapme', { interrupt: true }); go('talk'); } });
   txt('Talk', tx, ty + trr + 26, 26, '#fff', { lw: 6 });
   const ux = 150, uy = 440;
   glossBall(ux, uy, 56 * (pressed('h_custom') ? .92 : 1), '#a46bff'); drawIcon('brush', ux, uy + 2, 1.15);
@@ -250,11 +250,14 @@ function openParent() {
   const el = document.getElementById('parent'); el.style.display = 'flex';
   document.getElementById('pKid').value = SV.kid; document.getElementById('pBot').value = SV.bot; document.getElementById('pAll').checked = !!SV.all;
   document.getElementById('pStats').textContent = 'Games played: ' + (SV.plays.gobble + SV.plays.rocket + SV.plays.hero) + ' · Power Core fills: ' + SV.fills + ' · Level: ' + LEVEL_NAMES[level()];
+  document.getElementById('pMode').value = SV.talkMode || 'conv'; document.getElementById('pWait').value = SV.talkWait || 'normal'; document.getElementById('pDbg').checked = !!SV.debug;
   document.getElementById('pMic').textContent = 'Speech engine: ' + ({ idle: 'not loaded yet', loading: 'downloading (' + Math.round(VOSK.prog * 100) + '%)', ready: 'ready, works offline', failed: 'unavailable (' + VOSK.err + '); picture buttons still work' })[VOSK.state];
 }
 function closeParent() {
   const k = document.getElementById('pKid').value.trim().slice(0, 16), b = document.getElementById('pBot').value.trim().slice(0, 16);
-  SV.kid = k || 'Alex'; SV.bot = b || 'Bolt'; SV.all = document.getElementById('pAll').checked; save();
+  SV.kid = k || 'Alex'; SV.bot = b || 'Bolt'; SV.all = document.getElementById('pAll').checked;
+  const mode = document.getElementById('pMode').value; if (mode !== SV.talkMode && MIC.on) { micClose(); TK.conv = false; }
+  SV.talkMode = mode; SV.talkWait = document.getElementById('pWait').value; SV.debug = document.getElementById('pDbg').checked; save(); engCfg(); dbgShow(SV.debug); recEnsure();
   document.getElementById('parent').style.display = 'none';
 }
 function resetProgress() { if (!confirm('Reset Power Core, colors and hats?')) return; const k = SV.kid, b = SV.bot; SV = JSON.parse(JSON.stringify(DEF)); SV.kid = k; SV.bot = b; save(); closeParent(); }
@@ -278,7 +281,8 @@ cv.addEventListener('pointerdown', e => {
   if (portrait()) { rotDismissed = true; return; }
   if (document.getElementById('parent').style.display === 'flex') return;
   // a sleeping Bolt wakes on any tap (the mic button handles its own wake)
-  if ((scr === 'hub' && HUB.rig.asleep) || (scr === 'talk' && TK.rig.asleep && !BTN.some(b => b.id !== 'back' && btnHit(b, p)))) { wake(); return; }
+  if (scr === 'hub' && HUB.rig.asleep) { wake(); return; }
+  if (scr === 'talk') rigLook(TK.rig, p.x - TK.bolt.x, p.y - (TK.bolt.y - 290 * TK.bolt.s), 1400);   // his eyes follow Alex's finger
   for (let k = BTN.length - 1; k >= 0; k--) { const b = BTN[k]; if (btnHit(b, p)) { ptr.set(e.pointerId, { b, t0: now(), done: false }); if (b.down) b.down(); return; } }
   if (GAME_INPUT[scr]) { ptr.set(e.pointerId, 'game'); GAME_INPUT[scr]('down', p); return; }
   if (scr === 'title') { sfx('pop'); go('hub'); }
@@ -298,8 +302,8 @@ window.addEventListener('keydown', e => {
   if (e.code === 'Escape' && scr !== 'hub' && scr !== 'title') go('hub');
 });
 window.addEventListener('keyup', e => { if (e.code === 'Space' && GAME_INPUT[scr]) GAME_INPUT[scr]('up', { x: VW / 2, y: VH / 2 }); });
-window.addEventListener('blur', () => { if (LS.on) micUp(); ptr.clear(); if (scr === 'rocket') RK.hold = false; });
-document.addEventListener('visibilitychange', () => { if (document.hidden) { if (LS.on) micUp(); if (AC) AC.suspend(); } else if (AC) AC.resume(); });
+window.addEventListener('blur', () => { if (MIC.hold) micUp(); ptr.clear(); if (scr === 'rocket') RK.hold = false; });
+document.addEventListener('visibilitychange', () => { if (document.hidden) { if (MIC.hold) micUp(); if (MIC.on) { micClose(); TK.conv = false; if (scr === 'talk') { TK.rig.asleep = true; rigAct(TK.rig, 'sleep', 999, 'asleep'); TK.rig.asleep = true; } } if (AC) AC.suspend(); } else if (AC) AC.resume(); });
 // ---------------- main loop ----------------
 function drawRotate() {
   cx.setTransform(dpr, 0, 0, dpr, 0, 0); cx.fillStyle = '#140c3a'; cx.fillRect(0, 0, SW, SH);
@@ -310,9 +314,11 @@ function drawRotate() {
   cx.save(); cx.translate(SW / 2 + 110 * s, SH / 2 - 130 * s); cx.scale(s, s); cx.strokeStyle = '#ffd23f'; cx.lineWidth = 8; cx.lineCap = 'round'; cx.beginPath(); cx.arc(0, 0, 40, -2.5, 0); cx.stroke(); cx.fillStyle = '#ffd23f'; cx.beginPath(); cx.moveTo(52, -6); cx.lineTo(28, -6); cx.lineTo(40, 14); cx.fill(); cx.restore();
 }
 let last = now(), fpsAcc = 0, fpsN = 0, slowSecs = 0; window.__fps = 0;
+let ftAcc = 0, ftN = 0; window.__ft = 0;
 function frame(nw) {
+  const fs0 = performance.now();
   let dtR = Math.min(.05, (nw - last) / 1000); last = nw; fpsAcc += dtR; fpsN++;
-  if (fpsAcc > 1) { window.__fps = Math.round(fpsN / fpsAcc); fpsAcc = 0; fpsN = 0; if (window.__fps < 45 && !document.hidden && scrT > 3) { if (++slowSecs >= 2 && DPR_CAP > 1) { DPR_CAP = Math.max(1, DPR_CAP - .5); slowSecs = 0; resize(); } } else slowSecs = 0; }
+  if (fpsAcc > 1) { window.__fps = Math.round(fpsN / fpsAcc); fpsAcc = 0; fpsN = 0; if (window.__fps < 45 && !document.hidden && scrT > 3) { if (++slowSecs >= 2 && DPR_CAP > 1) { DPR_CAP = Math.max(1, DPR_CAP - .5); slowSecs = 0; resize(); } else if (slowSecs >= 3 && !LITE) { LITE = true; slowSecs = 0; } } else slowSecs = 0; }
   dtR *= TS; scrT += dtR;
   try {
     ptr.forEach(v => { if (v && v.b && v.b.hold && !v.done && now() - v.t0 > v.b.hold) { v.done = true; v.b.cb(); } });
@@ -329,17 +335,23 @@ function frame(nw) {
       cx.restore();
     }
   } catch (err) { console.error(err); }
+  ftAcc += performance.now() - fs0; if (++ftN >= 60) { window.__ft = +(ftAcc / ftN).toFixed(2); ftAcc = 0; ftN = 0; }
   requestAnimationFrame(frame);
 }
 // ---------------- test hooks for the headless bot (no effect on play) ----------------
-async function feedWav(url) { // runs a WAV through the exact same recognizer path as the mic (grammar, AC sample rate, classify, respond)
-  initAudio(); await voskLoad(); if (VOSK.state !== 'ready') return { err: VOSK.err || VOSK.state };
+// test hooks: play a WAV into the exact mic pipeline (turn engine + vosk + intent + reply) instead of the real microphone.
+// leak=true also routes Bolt's own voice into that "mic" (like a tablet speaker next to its mic) to prove he ignores himself.
+async function simMic(url, o) {
+  o = o || {}; initAudio(); await voskLoad(); if (VOSK.state !== 'ready') return { err: VOSK.err || VOSK.state };
+  if (!TK.conv) { SV.talkMode = 'conv'; TK.conv = true; recEnsure(); }
+  if (!MIC.on) {
+    const mix = AC.createGain(); micAttach(mix); MIC.mix = mix; if (o.leak) { TK.leak = mix; voxG.connect(mix); }
+    const n = AC.createBufferSource(), nb = AC.createBuffer(1, AC.sampleRate, AC.sampleRate), d = nb.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * .018; // room hiss at the same level as the test WAVs' own hiss (~-40 dBFS)
+    n.buffer = nb; n.loop = true; n.connect(mix); n.start();
+  }
   const ab = await (await fetch(url)).arrayBuffer(); const buf = await new Promise((res, rej) => AC.decodeAudioData(ab, res, rej));
-  LS.texts = []; LS.gotFinal = false; const rec = startRecognizer(); const d = buf.getChannelData(0), N = 4096;
-  for (let i = 0; i < d.length; i += N) { const b = AC.createBuffer(1, Math.min(N, d.length - i), AC.sampleRate); b.copyToChannel(d.slice(i, i + N), 0); rec.acceptWaveform(b); }
-  rec.retrieveFinalResult(); const t0 = now(); while (!LS.gotFinal && now() - t0 < 4000) await new Promise(r => setTimeout(r, 50));
-  try { rec.remove(); } catch (e) {}
-  const text = LS.texts.join(' ').trim(), k = classify(text); respond(k || 'huh', 'test'); return { text, key: k, rate: AC.sampleRate };
+  const s = AC.createBufferSource(); s.buffer = buf; s.connect(MIC.mix); const t0 = now(); s.start(); MIC.sim = s;
+  return { t0, dur: buf.duration };
 }
 window.__bb = {
   state: () => ({ scr, vosk: VOSK.state, voskProg: VOSK.prog, fps: window.__fps, said: vlog.slice(-8), sv: SV, resp: (window.__resp || []).slice(-5),
@@ -348,11 +360,13 @@ window.__bb = {
     rk: scr === 'rocket' ? { state: RK.state, d: Math.round(RK.d), len: RK_LEN, y: Math.round(RK.y), got: RK.got, next: (() => { const s = RK.stars.find(s => !s.got && s.x - RK.d > -20); return s ? Math.round(s.y) : null; })() } : null,
     hb: scr === 'hero' ? { state: HB.state, hp: HB.j.hp, t: +HB.t.toFixed(1) } : null,
     win: scr === 'win' ? { game: WIN.game, phase: WIN.phase, given: WIN.given, lvl: !!WIN.levelUp } : null }),
-  go: (s, a) => { initAudio(); go(s, a); }, respond: k => respond(k, 'test'), feedWav, view: () => ({ ox, oy, sc, VW, VH }),
+  go: (s, a) => { initAudio(); go(s, a); }, respond: k => respond(k, 'test'), simMic, startConv: () => startConv(true), micOff: () => { micClose(); TK.conv = false; },
+  talk: () => ({ cap: MIC.kind, eng: ENG.state, floor: ENG.floor, mic: MIC.on, conv: TK.conv, asleep: TK.rig.asleep, lat: TK.lat.slice(), heard: TK.heard.slice(), resp: (window.__resp || []).slice(), choice: TK.choice ? TK.choice.ch : null, mem: DLG.mem, busy: botBusy(), ignored: ENG.ignored, turn: TK.turn ? { partial: TK.turn.partial, answered: TK.turn.answered } : null, said: DLG.said.slice() }),
+  choiceTap, ask: k => askQuestion(k), dbg: on => dbgShow(on), tapBolt, rig: () => ({ move: TK.rig.move, listening: TK.rig.listening, face: TK.rig.face }), view: () => ({ ox, oy, sc, VW, VH }),
   reset: () => { SV = JSON.parse(JSON.stringify(DEF)); save(); }, openParent, closeParent, ls: () => LS.lastText,
 };
 // ---------------- boot ----------------
-loadSave(); resize();
+loadSave(); resize(); setTimeout(() => dbgShow(SV.debug), 0);
 if (QS.get('icon')) { // icon renderer (used once at build time to make the home-screen icons)
   const S = +QS.get('icon');
   cv.width = S; cv.height = S; cv.style.width = S + 'px'; cv.style.height = S + 'px';

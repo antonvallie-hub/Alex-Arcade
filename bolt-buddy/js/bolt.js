@@ -140,7 +140,8 @@ function drawBolt(o) {
   cx.scale(s, s);
   cx.translate(p.bx || 0, p.bob || 0);
   if (o.aura) { glow(0, -200, 230 + Math.sin(T * 8) * 12, 'rgba(255,220,90,1)', .55 * o.aura); }
-  cx.rotate(p.rot || 0);
+  if (p.lean && p.lean !== 1) cx.scale(p.lean, p.lean);
+  if (p.piv) { cx.translate(0, -190); cx.rotate(p.rot || 0); cx.translate(0, 190); } else cx.rotate(p.rot || 0);   // flips spin round his middle
   cx.scale((p.sx || 1) * (p.flip || 1), p.sy || 1);
   // cape
   if (o.cape) drawCape(P, T, 1, o.capeCol);
@@ -165,6 +166,12 @@ function drawBolt(o) {
     circ(0, -146, 19, '#1b2450'); circ(0, -146, 13, cl.replace(/[\d.]+\)$/, '1)'));
     glow(0, -146, 42 + Math.sin(T * 4) * 4, cl, .7 + (o.core || 0) * .3);
     circ(-4, -150, 4, 'rgba(255,255,255,.8)');
+    if (p.heartA > .02) { // love: a glowing pixel heart in his chest
+      glow(0, -146, 70 + Math.sin(T * 9) * 10, 'rgba(255,90,160,1)', p.heartA);
+      cx.save(); cx.globalAlpha *= p.heartA; const hs = 1 + Math.sin(T * 9) * .12; cx.translate(0, -146); cx.scale(hs, hs); cx.fillStyle = '#ff5aa0';
+      const H = ['.##.##.', '#######', '#######', '.#####.', '..###..', '...#...']; for (let j = 0; j < H.length; j++) for (let i = 0; i < 7; i++) if (H[j][i] === '#') cx.fillRect(-14 + i * 4, -12 + j * 4, 3.6, 3.6);
+      cx.restore();
+    }
   }
   // arms
   for (const sd of [-1, 1]) { cx.save(); cx.translate(sd * 62, -176); joint(0, 0, 14); arm(sd, P, (sd < 0 ? p.aL : p.aR) || 0, (sd < 0 ? p.eL : p.eR) || 0, (sd < 0 ? p.openL : p.openR)); cx.restore(); }
@@ -213,9 +220,6 @@ function drawHead(P, o, p, T) {
 }
 
 // ---- animation rig ----
-function BotRig() {
-  return { move: null, mt: 0, md: 0, face: 'happy', faceUntil: 0, blinkAt: now() + 2500, ear: 0, earT: 0, asleep: false, sleepT: 0, T: 0, onDone: null, flip: 1, look: [0, 0], lookT: 0, hue: null };
-}
 const MOVES = {
   wave: (t, k) => ({ aR: 1.95, eR: .55 + Math.sin(t * 14) * .4, hr: .08, openR: 1, aL: .2 }),
   hop: (t, k) => { const h = Math.sin(k * PI); return { bob: -70 * h, sy: k < .1 || k > .9 ? .9 : 1.04, aL: .6 + h, aR: .6 + h }; },
@@ -244,33 +248,146 @@ const MOVES = {
   bonk: (t, k) => { const q = k < .4 ? k / .4 : 1 - (k - .4) / .6; return { aR: 2.1 * q, eR: .5, aL: .4, rot: .08 * q, bob: -20 * q }; },
   colors: (t, k) => ({ sx: Math.cos(k * TAU * 1.5) * 1, bob: -Math.sin(k * PI) * 40, aL: 1.9, aR: 1.9, eL: .5, eR: .5, openL: 1, openR: 1 }),
 };
+
+// ---- animation rig v2: spring physics (follow-through + overlap), squash & stretch, anticipation, idle life, look-at, mouth sync ----
+const RM = (() => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } })() || /[?&]rm=1/.test(location.search);
+function BotRig() {
+  return { move: null, mt: 0, md: 0, face: 'happy', faceUntil: 0, blinkAt: now() + 2500, ear: 0, earT: 0, asleep: false, sleepT: 0, T: 0, onDone: null, flip: 1, look: [0, 0], lookT: 0, hue: null,
+    sp: {}, sq: 0, sqV: 0, prevV: 0, antK: 0, antV: 0, ant: 0, idleT: 2 + Math.random() * 2, idle: false, listening: 0, talking: 0, lookAt: null, heart: 0, chest: 0, onLand: null };
+}
+const easeIO = t => { t = clamp(t, 0, 1); return t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; };
+// anticipation helper: crouch (q 0..1) before a launch
+const crouch = q => ({ bob: 14 * Math.sin(q * PI / 2), sy: 1 - .16 * Math.sin(q * PI / 2), sx: 1 + .1 * Math.sin(q * PI / 2), aL: -.2, aR: -.2, hy: 6 });
+const MOVES2 = {
+  // big happy jump: crouch -> launch -> hang -> land (landing squash comes from the spring physics)
+  hop: (t, k) => { if (k < .18) return crouch(k / .18); const q = (k - .18) / .82, h = Math.sin(q * PI); return { bob: -90 * h, aL: .5 + 1.2 * h, aR: .5 + 1.2 * h, eL: .4, eR: .4, openL: 1, openR: 1, lL: .12 * h, lR: .12 * h }; },
+  spinHappy: (t, k) => { if (k < .16) return crouch(k / .16); const q = (k - .16) / .84, h = Math.sin(q * PI); return { bob: -150 * h, sx: Math.cos(easeIO(q) * TAU * 2), aL: 2.1, aR: 2.1, eL: .3, eR: .3, openL: 1, openR: 1, lL: .2 * h, lR: .2 * h }; },
+  backflip: (t, k) => {
+    if (k < .2) return crouch(k / .2);
+    if (k < .82) { const q = (k - .2) / .62, h = Math.sin(q * PI); return { bob: -230 * h, rot: -TAU * easeIO(q), piv: 1, aL: 1.2, aR: 1.2, eL: 2, eR: 2, lL: -.5 * h, lR: -.5 * h, lyL: -24 * h, lyR: -24 * h }; }
+    const q = (k - .82) / .18; return { aL: 2.2 * (1 - q) + .4, aR: 2.2 * (1 - q) + .4, openL: 1, openR: 1, eL: .3, eR: .3 };   // ta-da!
+  },
+  hover: (t, k) => { const up = k < .15 ? k / .15 : k > .85 ? (1 - k) / .15 : 1; return { bob: -95 * easeIO(up) + Math.sin(t * 5) * 8 * up, rot: Math.sin(t * 2.6) * .06, jet: up > .05 ? .55 : 0, aL: 1.0, aR: 1.0, eL: .6, eR: .6, openL: 1, openR: 1, lL: -.08, lR: .08 }; },
+  hug: (t, k) => { const sq = Math.sin(Math.min(1, k * 1.6) * PI * 2.5) * .5 + .5; return { aL: 1.25, aR: 1.25, eL: 2.05, eR: 2.05, sx: 1 + .05 * sq, sy: 1 - .045 * sq, hr: .16 * Math.sin(t * 2.4), bob: -6 * sq, hy: 4, openL: 1, openR: 1, heart: 1 }; },
+  peek: (t, k) => {
+    // dash off to the side, peek back in with a lean, then pop home
+    if (k < .22) { const q = easeIO(k / .22); return { bx: 820 * q, rot: .12 * Math.sin(q * PI), aL: .8, aR: .8, bob: -Math.abs(Math.sin(t * 14)) * 14 }; }
+    if (k < .45) return { bx: 820 };
+    if (k < .75) { const q = easeOut((k - .45) / .3); return { bx: 820 - 300 * q, rot: -.28 * q, hr: -.25 * q, aL: .3, aR: 1.6 * q, openR: 1, eR: .4 }; }
+    const q = easeIO((k - .75) / .25); return { bx: 520 * (1 - q), rot: -.28 * (1 - q), bob: -60 * Math.sin(q * PI), aL: 1.2 * Math.sin(q * PI), aR: 1.2 * Math.sin(q * PI) };
+  },
+  dance: (t, k) => {
+    // full-body party dance: side steps on the beat, arm pumps, hip sway, head bop, finishing spin
+    const b = t * 2.2 * TAU / 2, beat = Math.sin(b), hit = Math.abs(Math.sin(b));
+    if (k > .82) { const q = (k - .82) / .18; return { sx: Math.cos(easeIO(q) * TAU), bob: -70 * Math.sin(q * PI), aL: 2.1, aR: 2.1, openL: 1, openR: 1 }; }
+    const sec = Math.floor(k * 4) % 3;
+    if (sec === 0) return { bx: beat * 46, rot: beat * .1, bob: -hit * 22, aL: 1.0 + beat * .9, aR: 1.0 - beat * .9, eL: 1.2, eR: 1.2, lyL: Math.max(0, beat) * -18, lyR: Math.max(0, -beat) * -18, hr: -beat * .14, openL: 1, openR: 1 };
+    if (sec === 1) return { rot: beat * .16, bob: -hit * 14, aL: hit > .5 ? 2.6 : .5, aR: hit > .5 ? .5 : 2.6, eL: .2, eR: .2, hr: beat * .12, lL: beat * .15, lR: beat * .15, openL: 1, openR: 1 };
+    return { bx: Math.sin(t * 3) * 60, bob: -hit * 26, sy: 1 + hit * .04, aL: 1.6 + Math.sin(t * 18) * .3, aR: 1.6 - Math.sin(t * 18) * .3, eL: 1, eR: 1, hr: Math.sin(t * 9) * .1 };
+  },
+  stomp: (t, k) => { const s = Math.sin(t * 9); return { lyL: Math.max(0, s) * -30, lyR: Math.max(0, -s) * -30, lL: Math.max(0, s) * .2, lR: Math.max(0, -s) * .2, bob: -Math.abs(s) * 8, aL: .9, aR: .9, eL: 1.7, eR: 1.7, rot: s * .04 }; },
+  brave: (t, k) => k < .35 ? { bx: Math.sin(t * 45) * 4 * (1 - k / .35), aL: .3, aR: .3, sy: .97 } : { aL: 1.6, aR: 1.6, eL: 2.2, eR: 2.2, sy: 1.05, bob: -10, hr: -.05 },
+  chomp: (t, k) => ({ hy: Math.abs(Math.sin(t * 16)) * 12, hr: Math.sin(t * 8) * .06, aL: .9, aR: .9, eL: 1.9, eR: 1.9, bob: -Math.abs(Math.sin(t * 8)) * 6 }),
+  flap: (t, k) => { const f = Math.sin(t * 22); return { aL: 1.4 + f * .6, aR: 1.4 + f * .6, eL: .2, eR: .2, bob: -30 - f * 8, openL: 1, openR: 1 }; },
+  bunny: (t, k) => { const q = (t * 2.4) % 1, h = Math.sin(q * PI); return { bob: -55 * h, sy: q < .12 ? .88 : 1.04, aL: .4, aR: .4, eL: 2.4, eR: 2.4 }; },
+  listenLean: (t, k) => ({ lean: 1.06, hy: 10, hr: -.1, aL: .25, aR: .25, eL: .5, eR: .5, bob: 4 }),
+  // idle life (short, subtle, interruptible)
+  lookL: (t, k) => ({ hr: -.2 * Math.sin(k * PI), lookX: -10 * Math.sin(k * PI) }),
+  lookR: (t, k) => ({ hr: .2 * Math.sin(k * PI), lookX: 10 * Math.sin(k * PI) }),
+  lookUp: (t, k) => ({ hr: .05, lookY: -6 * Math.sin(k * PI), hy: -6 * Math.sin(k * PI) }),
+  stretch: (t, k) => { const s = Math.sin(k * PI); return { aL: 2.3 * s, aR: 2.3 * s, eL: .2, eR: .2, sy: 1 + .07 * s, sx: 1 - .03 * s, openL: 1, openR: 1, hr: -.08 * s }; },
+  tapFoot: (t, k) => ({ lR: Math.max(0, Math.sin(t * 14)) * .18, lyR: -Math.max(0, Math.sin(t * 14)) * 8, hr: Math.sin(t * 7) * .05 }),
+  sway: (t, k) => ({ rot: Math.sin(k * TAU) * .07, bx: Math.sin(k * TAU) * 10, hr: -Math.sin(k * TAU) * .08, aL: .3 + Math.sin(k * TAU) * .2, aR: .3 - Math.sin(k * TAU) * .2 }),
+  smallWave: (t, k) => ({ aR: 1.6 * Math.sin(k * PI), eR: .5 + Math.sin(t * 16) * .35, openR: 1, hr: .06 }),
+  antWiggle: (t, k) => ({ hr: Math.sin(t * 12) * .04 }),
+};
+Object.assign(MOVES, MOVES2);
+const IDLE = ['lookL', 'lookR', 'lookUp', 'hop', 'stretch', 'tapFoot', 'sway', 'smallWave', 'antWiggle', 'lookL', 'lookR', 'sway'];
+const IDLE_RARE = ['spinHappy', 'hover', 'peek'];
+const RM_SWAP = { backflip: 'hop', spinHappy: 'hop', spin: 'cheer', peek: 'smallWave', hover: 'cheer', rocket: 'cheer', colors: 'cheer', dance: 'sing' };
 function rigAct(R, name, dur, face, onDone) {
-  R.move = name; R.mt = 0; R.md = dur || 1.2; R.onDone = onDone || null;
+  if (RM && RM_SWAP[name]) name = RM_SWAP[name];
+  R.move = name; R.mt = 0; R.md = dur || 1.2; R.onDone = onDone || null; R.idle = false;
   if (face) { R.face = face; R.faceUntil = now() + R.md * 1000 + 150; }
   if (name !== 'sleep') R.asleep = false;
+  R.antV += (Math.random() < .5 ? -1 : 1) * 6;   // every new move flicks the antenna
 }
+function rigIdle(R, name, dur) { if (R.move || R.asleep) return; rigAct(R, name, dur); R.idle = true; }
 function rigFace(R, face, ms) { R.face = face; R.faceUntil = now() + (ms || 1500); }
+function rigLook(R, x, y, ms) { R.lookAt = { x, y, until: now() + (ms || 1200) }; }
+// spring: x'' = k (target - x) - c x'  (under-damped = overshoot + settle = follow-through)
+const SPR = { bob: [300, 19], bx: [200, 17], rot: [260, 17], hr: [120, 9.5], hx: [160, 13], hy: [200, 14], aL: [210, 13], aR: [190, 12.5], eL: [260, 14], eR: [240, 13.5], lL: [320, 20], lR: [320, 20], lyL: [420, 24], lyR: [420, 24], lean: [180, 15], lookX: [260, 22], lookY: [260, 22] };
+function spring(R, key, target, dt) {
+  let s = R.sp[key]; if (!s) s = R.sp[key] = { x: target, v: 0 };
+  const kc = SPR[key]; const n = Math.max(1, Math.ceil(dt / (1 / 120))), h = dt / n;
+  for (let i = 0; i < n; i++) { const a = kc[0] * (target - s.x) - kc[1] * s.v; s.v += a * h; s.x += s.v * h; }
+  if (!isFinite(s.x)) { s.x = target; s.v = 0; }
+  return s.x;
+}
 function rigPose(R, dt) {
-  R.T += dt; const T = R.T;
-  const base = { bob: Math.sin(T * 2.4) * 3, sy: 1 + Math.sin(T * 2.4) * .012, aL: .14 + Math.sin(T * 2.4) * .04, aR: .14 + Math.sin(T * 2.4 + .5) * .04, eL: .25, eR: .25, ant: Math.sin(T * 3.1) * .1, sx: 1, rot: 0, hr: Math.sin(T * .9) * .03 };
+  dt = Math.min(dt || 0, .05); R.T += dt; const T = R.T;
+  const br = Math.sin(T * 1.7);                                         // breathing
+  const base = { bob: Math.sin(T * 2.4) * 2 + br * 1.5, sy: 1 + br * .016, sx: 1 - br * .006, aL: .14 + br * .05, aR: .14 + Math.sin(T * 1.7 + .4) * .05, eL: .25, eR: .25, ant: 0, rot: 0, hr: Math.sin(T * .9) * .03, hx: 0, hy: -br * 1.5, bx: 0, lL: 0, lR: 0, lyL: 0, lyR: 0, lean: 1, lookX: 0, lookY: 0 };
   let p = base;
+  const amp = RM ? .5 : 1;
   if (R.move) {
     R.mt += dt; const k = clamp(R.mt / R.md, 0, 1), mv = MOVES[R.move](R.mt, k);
-    const w = R.move === 'sleep' ? clamp(R.mt / .6, 0, 1) : Math.min(1, R.mt / .12, (R.md - R.mt) / .15 + (R.move === 'spin' || R.move === 'colors' ? 1 : 0));
+    const w = R.move === 'sleep' ? clamp(R.mt / .6, 0, 1) : 1;
     p = Object.assign({}, base);
-    for (const key in mv) { const v = mv[key]; p[key] = typeof v === 'number' && typeof base[key] === 'number' ? lerp(base[key], v, clamp(w, 0, 1)) : (w > .02 ? v : (base[key] || 0)); }
-    if (R.mt >= R.md && R.move !== 'sleep') { const f = R.onDone; R.move = null; R.onDone = null; if (f) f(); }
+    for (const key in mv) { const v = mv[key]; p[key] = typeof v === 'number' && typeof base[key] === 'number' ? lerp(base[key], v, w * (key === 'sx' || key === 'sy' || key === 'lean' ? 1 : amp)) : v; }
+    if (R.mt >= R.md && R.move !== 'sleep') { const f = R.onDone; R.move = null; R.onDone = null; R.idle = false; if (f) f(); }
   }
-  p.ant = (p.ant || 0) + Math.sin(T * 9) * (R.move ? .12 : 0);
-  // face: blink + look-around
+  // listening: lean in toward Alex, ears up; talking: head bops with the voice
+  if (R.listening > .01 && (!R.move || R.idle)) { const L = MOVES.listenLean(T, 0); for (const key in L) p[key] = lerp(p[key] == null ? base[key] : p[key], L[key], R.listening); }
+  if (R.talking > .01) { p.hy = (p.hy || 0) - R.talking * 7; p.hr = (p.hr || 0) + Math.sin(T * 7) * .04 * R.talking; R.antV += R.talking * dt * 30 * Math.sin(T * 23); }
+  // look-at (head + eyes follow a tap)
+  if (R.lookAt && now() < R.lookAt.until) { p.lookX = clamp(R.lookAt.x / 30, -11, 11); p.lookY = clamp(R.lookAt.y / 40, -6, 6); p.hr = (p.hr || 0) + clamp(R.lookAt.x / 2500, -.2, .2); }
+  else if (!R.move) { if ((R.lookT -= dt) < 0) { R.lookT = 1.2 + Math.random() * 2.4; R.look = Math.random() < .45 ? [0, 0] : [rnd(-8, 8), rnd(-4, 4)]; } p.lookX = R.look[0]; p.lookY = R.look[1]; }
+  // springs for every continuous channel -> overlap: arms and head arrive after the body, antenna wobbles last
+  const prevBob = R.sp.bob ? R.sp.bob.x : 0;
+  for (const key in SPR) p[key] = spring(R, key, p[key] == null ? (base[key] || 0) : p[key], dt);
+  if (!R.move && Math.abs(R.sp.rot.x) > PI) R.sp.rot.x -= Math.sign(R.sp.rot.x) * TAU;   // after a flip: same angle, no unwind
+  p.piv = R.move === 'backflip' ? 1 : 0;
+  const vy = R.sp.bob.v;
+  // squash on landing, stretch in flight
+  if (R.prevV > 380 && vy < 120 && R.sp.bob.x > -25) { R.sqV -= Math.min(.32, R.prevV / 2600) * 22; R.antV -= R.prevV / 60; if (R.onLand) R.onLand(R.prevV); }
+  R.prevV = vy;
+  R.sqV += (-260 * R.sq - 10 * R.sqV) * dt; R.sq += R.sqV * dt; R.sq = clamp(R.sq, -.35, .35);
+  const st = R.sp.bob.x < -12 ? clamp(-vy / 2800, -.09, .13) * amp : 0;
+  p.sy = (p.sy || 1) * (1 + R.sq * amp) * (1 + st); p.sx = (p.sx || 1) * (1 - R.sq * .7 * amp) * (1 - st * .5);
+  // antenna: driven by body acceleration + its own wobbly spring
+  const acc = (R.sp.bob.x - prevBob) / Math.max(dt, 1e-3);
+  R.antV += (-acc * .0009 - (R.sp.rot ? R.sp.rot.v : 0) * .5) * (RM ? .4 : 1);
+  R.antV += (-90 * R.ant - 4.2 * R.antV) * dt; R.ant += R.antV * dt; R.ant = clamp(R.ant, -.9, .9);
+  p.ant = Math.sin(T * 3.1) * .08 + R.ant;
+  // chest heart glow for love/hugs
+  R.heart = lerp(R.heart, p.heart ? 1 : 0, Math.min(1, dt * 5)); p.heartA = R.heart;
+  // face: blink + emotion
   let face = R.face;
   if (R.faceUntil && now() > R.faceUntil) { R.faceUntil = 0; R.face = face = 'happy'; }
   if (R.asleep) face = 'asleep';
+  else if (R.listening > .5 && !R.faceUntil) face = 'listen';
   else if (!R.faceUntil && face === 'happy') {
-    if (now() > R.blinkAt) { if (now() > R.blinkAt + 130) R.blinkAt = now() + 2200 + Math.random() * 3500; else face = 'blink'; }
+    if (now() > R.blinkAt) { if (now() > R.blinkAt + 130) R.blinkAt = now() + (Math.random() < .2 ? 250 : 2200 + Math.random() * 3500); else face = 'blink'; }
   }
-  if ((R.lookT -= dt) < 0) { R.lookT = 1.5 + Math.random() * 2.5; R.look = Math.random() < .5 ? [0, 0] : [rnd(-6, 6), rnd(-3, 3)]; }
-  R.lx = lerp(R.lx || 0, R.look[0], .12); R.ly = lerp(R.ly || 0, R.look[1], .12); p.lookX = R.lx; p.lookY = R.ly;
   R.ear = Math.max(0, R.ear - dt * 2);
   p.face = face; return p;
+}
+// idle life: a small action every few seconds so he never looks frozen (call from screens that want it)
+function rigIdleTick(R, dt, quietOK) {
+  if (R.move || R.asleep) { R.idleT = Math.max(R.idleT, 1.2); return null; }
+  if ((R.idleT -= dt) > 0) return null;
+  R.idleT = 2.2 + Math.random() * 3.6;
+  const rare = !RM && Math.random() < .12;
+  const name = rare ? pick(IDLE_RARE) : pick(IDLE);
+  const dur = { hop: .9, spinHappy: 1.3, hover: 2.4, peek: 3.4, stretch: 1.6, tapFoot: 1.4, sway: 2.2, smallWave: 1.3, antWiggle: .8, lookL: 1.4, lookR: 1.4, lookUp: 1.2 }[name] || 1.2;
+  rigIdle(R, name, dur);
+  if (name === 'antWiggle') R.antV += 12;
+  return name;
+}
+// mouth sync: same eyes as the current face, mouth picked from the voice level
+G.ohBig = { u: 3, rows: ['.###.', '#...#', '#...#', '#...#', '.###.'] };
+function talkFace(face, lv) {
+  const f = FACES[face] || FACES.happy; const m = lv < .1 ? (f[2] || 'smile') : lv < .3 ? 'small' : lv < .55 ? 'oh' : lv < .8 ? 'grin' : 'ohBig';
+  const key = face + '~' + m; if (!FACES[key]) FACES[key] = [f[0], f[1], m, f[3]]; return key;
 }

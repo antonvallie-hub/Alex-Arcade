@@ -49,7 +49,7 @@ function cover(img, x, y, w, h, fx, fy) { // draw image covering the rect (focus
 
 // ===== save =====
 const SAVE_KEY = 'bolt-buddy-v1';
-const DEF = { kid: 'Alex', bot: 'Bolt', color: 0, hat: 0, bolts: 0, fills: 0, total: 0, unlock: { c: 3, h: 4 }, all: false, plays: { gobble: 0, rocket: 0, hero: 0 }, stars: 0 };
+const DEF = { kid: 'Alex', bot: 'Bolt', color: 0, hat: 0, bolts: 0, fills: 0, total: 0, unlock: { c: 3, h: 4 }, all: false, plays: { gobble: 0, rocket: 0, hero: 0 }, stars: 0, talkMode: 'conv', talkWait: 'normal', debug: false };
 let SV = JSON.parse(JSON.stringify(DEF));
 function loadSave() { try { const p = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (p) SV = Object.assign(JSON.parse(JSON.stringify(DEF)), p); } catch (e) {} }
 function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(SV)); } catch (e) {} }
@@ -109,10 +109,11 @@ function rays(x, y, n, len, w, col, rot) {
 }
 
 // ===== particles (pooled, capped) =====
-const FX = []; const FX_MAX = 260;
-function fx(o) { if (FX.length >= FX_MAX) FX.shift(); o.t = 0; o.life = o.life || 1; o.vx = o.vx || 0; o.vy = o.vy || 0; o.g = o.g || 0; o.rot = o.rot || 0; o.vr = o.vr || 0; FX.push(o); return o; }
+const FX = []; const FX_MAX = 260; let LITE = /[?&]lite=1/.test(location.search); // LITE: still slow at DPR 1 -> fewer particles
+function fx(o) { if (FX.length >= (LITE ? 110 : FX_MAX)) FX.shift(); o.t = 0; o.life = o.life || 1; o.vx = o.vx || 0; o.vy = o.vy || 0; o.g = o.g || 0; o.rot = o.rot || 0; o.vr = o.vr || 0; FX.push(o); return o; }
 function burst(x, y, n, o) {
   o = o || {}; const cols = o.cols || ['#ffd23f', '#7ff', '#ff7ac6', '#9f7bff', '#fff', '#7dff7a'];
+  if (LITE) n = Math.ceil(n / 2);
   for (let i = 0; i < n; i++) {
     const a = rnd(0, TAU), sp = rnd(o.sp0 || 120, o.sp1 || 420);
     fx({ k: o.k || pick(['star', 'conf', 'dot']), x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - (o.up || 80), g: o.g == null ? 520 : o.g, life: rnd(.6, 1.2) * (o.life || 1), s: rnd(6, 14) * (o.size || 1), c: pick(cols), rot: rnd(0, TAU), vr: rnd(-8, 8) });
